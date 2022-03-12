@@ -1,0 +1,35 @@
+{
+  "name": "talos",
+  "description": "Compilador de librojuegos",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ByFernanz/talos.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/ByFernanz/talos/issues"
+  },
+  "homepage": "https://github.com/ByFernanz/talos#readme",
+  "devDependencies": {
+    "@babel/core": "^7.17.5",
+    "coffeescript": "^2.6.1",
+    "grunt": "^1.4.1",
+    "grunt-browserify": "^6.0.0",
+    "grunt-contrib-coffee": "^2.1.0",
+    "grunt-contrib-copy": "^1.0.0",
+    "grunt-contrib-sass": "^2.0.0",
+    "grunt-contrib-uglify": "^5.0.1",
+    "grunt-contrib-watch": "^1.1.0",
+    "jquery": "^3.6.0",
+    "js-yaml": "^4.1.0",
+    "live-server": "^1.2.1",
+    "markdown-it": "^12.3.2"
+  }
+}
