@@ -13,8 +13,9 @@
 <body>
     <div id="talos-play"></div>
     <script>
-        let texto
-        $.get('story.md', (story) => texto = story)
+        $.get('story.md', function(story){
+            talos = new Talos(parseText(story), {})
+        }) 
     </script>
 </body>
 </html>

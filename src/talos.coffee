@@ -1,3 +1,5 @@
+test = null
+
 regexLib =
 	normal: /^[a-z][a-z_0-9]*\s{0,1}(.*)$/m,
 	fixed: /^[0-9]+\s{0,1}(.*)$/m,
@@ -61,6 +63,10 @@ extractBlocks = (lines) ->
 		blocks.push currentBlock
 	return blocks
 
+randomNum = (min, max) ->
+    r = Math.random()*(max-min) + min
+    return Math.floor(r)
+
 class Talos
 	constructor: (
 		@story,
@@ -111,9 +117,65 @@ class Talos
 					blockIndex:	index
 					number:  parseInt el.name
 				fixedSections.push currentSection
-			index +=1
-		console.log(@src)
-		console.log(fixedSections)
+			index++
+		
+		# ASIGNAR NUMEROS ALEATORIOS A LA SECCIONES
+		mapSections = []
+		currentSection = null
+		index = 0
+		indexFix = 0
+		diff = 0
+		min = 0
+		max = 0
+		num = []
+		rev = 0
+		for el in @story.blocks
+			if el.type is 'fixed'
+				if fixedSections[indexFix].number is parseInt el.name
+					if fixedSections[indexFix + 1]?
+						min = fixedSections[indexFix].number
+						max = fixedSections[indexFix + 1].number
+						# Diferencia de posicion en el index
+						diff = (fixedSections[indexFix + 1].blockIndex - index) - 1
+						rev = min + diff + 1
+						if rev > max
+							console.log("ERROR: La cantidad de secciones supera el numero fijo")
+							break
+					else
+						diff = @story.blocks.length - fixedSections[indexFix].number
+						max = @story.blocks.length
+					count = min + 1
+					num = []
+					while count <= (min + diff)
+						num.push count
+						count++	
+				indexFix++
+				#console.log(num)
+			else if el.type is 'normal'
+					fix = randomNum(0, num.length)
+					console.log("num", num)
+					currentSection =
+						name: el.name
+						number: num[fix]
+						index: index
+					@story.blocks[index].name = String(num[fix])
+					num.splice(fix, 1)
+					console.log("splice", num)
+					mapSections.push currentSection
+			index++
+		console.log(mapSections)
+		console.log(@story.blocks)
+
+			
+		# CAMBIAR POR NUMEROS LOS ENLACES
+
+		# IMPRIMIR EN EL SRC
+
+		# CONVERTIR MARKDOWN A HTML
+
+		# CONVERTIR HTML A RTF
+
+
 				
 
 		
