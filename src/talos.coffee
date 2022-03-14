@@ -3,7 +3,8 @@ test = null
 regexLib =
 	normal: /^[a-z][a-z_0-9]*\s{0,1}(.*)$/m,
 	fixed: /^[0-9]+\s{0,1}(.*)$/m,
-	ignored: /^[A-Z].*$/m
+	ignored: /^[A-Z].*$/m,
+	link:  /\[([^\[\]]+)\](?!\(|\:|{)/gm
 
 parseText = (text) ->
 	lines = text.split /\n|\r\n/
@@ -67,6 +68,36 @@ randomNum = (min, max) ->
     r = Math.random()*(max-min) + min
     return Math.floor(r)
 
+searchElem = (sec, mapSections) ->
+	for el in mapSections
+		name = "[#{el.name}]"
+		if name is sec
+			if el?
+				console.log(el.name)
+				console.log(el.number)
+				return el.number
+
+toRTF = (html) ->
+	htmlToRtfLocal = new window.htmlToRtf()
+	rtfContent = htmlToRtfLocal.convertHtmlToRtf(html)
+	return rtfContent
+
+saveTextFile = (doc, ext) ->
+	textToWrite = doc
+	fileNameToSaveAs = "story.#{ext}"
+	textFileAsBlob = new Blob([textToWrite], {type:'text/plain'})
+	downloadLink = document.createElement("a")
+	downloadLink.download = fileNameToSaveAs
+	downloadLink.innerHTML = "Download File"
+	if window.webkitURL?
+		downloadLink.href = window.webkitURL.createObjectURL(textFileAsBlob)
+	else
+		downloadLink.href = window.URL.createObjectURL(textFileAsBlob)
+		downloadLink.onclick = destroyClickedElement
+		downloadLink.style.display = "none"
+		document.body.appendChild(downloadLink)
+	downloadLink.click()
+
 class Talos
 	constructor: (
 		@story,
@@ -103,9 +134,9 @@ class Talos
 		# PROCESAMIENTO DE YML
 		@yaml = jsyaml.load(@story.yml)
 		if @yaml.title?
-			@src += "<h1 style='font-size: 2.5em; text-align: center'>#{@yaml.title}</h1>\n"
+			@src += "<h1 style='font-size: 2.5em; text-align: center'>#{@yaml.title}</h1>\n\n"
 		if @yaml.author?
-			@src += "<h1 style='font-style: italic; text-align: center'>#{@yaml.author}</h1>\n"
+			@src += "<h1 style='font-style: italic; text-align: center;margin-bottom: 2em;'>#{@yaml.author}</h1>\n\n"
 		
 		# GUARDAR SECCIONES FIJAS Y SU INDICE
 		fixedSections = []
@@ -150,30 +181,80 @@ class Talos
 						num.push count
 						count++	
 				indexFix++
-				#console.log(num)
 			else if el.type is 'normal'
 					fix = randomNum(0, num.length)
-					console.log("num", num)
 					currentSection =
 						name: el.name
 						number: num[fix]
 						index: index
 					@story.blocks[index].name = String(num[fix])
 					num.splice(fix, 1)
-					console.log("splice", num)
 					mapSections.push currentSection
 			index++
-		console.log(mapSections)
-		console.log(@story.blocks)
 
 			
 		# CAMBIAR POR NUMEROS LOS ENLACES
+		index = 0
+		for el in @story.blocks
+			indexL = 0
+			newlines = []
+			for line in el.lines
+				matches = line.match(regexLib.link)
+				if matches?
+					for sec in matches
+						content = sec.replace("[","")
+						content = content.replace("]","")
+						if isNaN(content)
+							number = searchElem(sec, mapSections)
+						else
+							number = content
+						line=line.replaceAll(sec, "[#{number}](##{number})")
+				@story.blocks[index].lines[indexL] = line
+				indexL++
+			index++
+		console.log(@story.blocks)
 
-		# IMPRIMIR EN EL SRC
+		# ORDENAR E IMPRIMIR EN EL SRC
+		index = 0
+		elsNorm = []
+		for el in @story.blocks
+			if el.type is "ignored"
+				@src+="<h1 style='text-align: center;'>#{el.name}</h1>\n\n"
+				for line in el.lines
+					@src+="#{line}\n"
+			else if el.type is "fixed"
+				if elsNorm?
+					elsNorm.sort((a,b) ->
+						if parseInt(a.name) > parseInt(b.name)
+							return 1
+						else
+							return -1)
+					for els in elsNorm
+						@src+="<h1 id='#{els.name}' style='text-align: center;'>#{els.name}</h1>\n\n"
+						for line in els.lines
+							@src+="#{line}\n"
+				elsNorm = []
+				@src+="<h1 id='#{el.name}' style='text-align: center;'>#{el.name}</h1>\n\n"
+				for line in el.lines
+					@src+="#{line}\n"
+			else if el.type is "normal"
+				elsNorm.push el
+				# como ordenar elementos renumerados
+			index++
+		console.log(@src)
+		
 
 		# CONVERTIR MARKDOWN A HTML
+		html = @converter.render(@src)
 
-		# CONVERTIR HTML A RTF
+		# CONVERTIR HTML A RTF, y guardar como *.rtf
+		if @yaml.output?
+			if @yaml.output is 'rtf'
+				saveTextFile(toRTF(html), 'rtf')
+		else
+			saveTextFile(toRTF(html), 'rtf')
+
+
 
 
 				
