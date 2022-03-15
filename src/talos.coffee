@@ -77,14 +77,82 @@ searchElem = (sec, mapSections) ->
 				console.log(el.number)
 				return el.number
 
-toRTF = (html) ->
-	htmlToRtfLocal = new window.htmlToRtf()
-	rtfContent = htmlToRtfLocal.convertHtmlToRtf(html)
-	return rtfContent
+toPDF = (html, meta) ->
+	html += "<style>body{font-size:1.3em;}a{color:black;font-weight:bold;text-decoration:none;pointer-events:none;}</style>"
+	html = html.replace(/href=\"(.*?)\"/gm,"")
+	div = document.createElement('div')
+	div.id = 'content'
+	div.innerHTML = html
+	opt =
+		filename:     "#{meta.title}.pdf"
+		image:        { type: 'jpeg', quality: 0.98 }
+		html2canvas:  { scale: 2 }
+		margin: 0.7
+		enableLinks: true
+		pagebreak:
+			mode: 'avoid-all'
+		jsPDF:       
+			unit: 'in'
+			format: 'letter'
+			orientation: 'portrait'
+	html2pdf().set(opt).from(div).save()
 
-saveTextFile = (doc, ext) ->
+toHTML = (html, meta) ->
+	html = """
+		<!DOCTYPE html>
+			<html lang="#{meta.lang}">
+			<head>
+    			<meta charset="UTF-8">
+    			<meta http-equiv="X-UA-Compatible" content="IE=edge">
+    			<meta name="viewport" content="width=device-width, initial-scale=1.0">
+   				<title>#{meta.title}</title>
+			</head>
+			<body>
+				#{html}
+			</body>
+		</html>
+		"""
+	return html
+
+toEPUB = (html, meta) ->
+	deltitles = html.split('\n')
+	deltitles.splice(0,1)
+	deltitles.splice(0,1)
+	html = deltitles.join('\n')
+	jepub = new jEpub()
+	jepub.init({
+		i18n: meta.lang,
+		title: meta.title,
+		author: meta.author,
+		publisher: meta.publisher,
+		description: meta.description,
+		tags: meta.tags
+	})
+	jepub.date(new Date())
+	#jepub.cover(data: object)
+	jepub.add("Librojuego", html)
+	#jepub.image(data: object, IMG_ID: string)
+	blob = await jepub.generate("blob")
+	fileNameToSaveAs = "#{meta.title}.epub"
+	downloadLink = document.createElement("a")
+	downloadLink.download = fileNameToSaveAs
+	downloadLink.innerHTML = "Download File"
+	if window.webkitURL?
+		downloadLink.href = window.webkitURL.createObjectURL(blob)
+	else
+		downloadLink.href = window.URL.createObjectURL(blob)
+		downloadLink.onclick = destroyClickedElement
+		downloadLink.style.display = "none"
+		document.body.appendChild(downloadLink)
+	downloadLink.click()
+
+toDOCX = (html, meta) ->
+	doc = htmlDocx.asBlob(html)
+	saveAs(doc,"#{meta.title}.docx")
+
+saveTextFile = (doc, meta, ext) ->
 	textToWrite = doc
-	fileNameToSaveAs = "story.#{ext}"
+	fileNameToSaveAs = "#{meta.title}.#{ext}"
 	textFileAsBlob = new Blob([textToWrite], {type:'text/plain'})
 	downloadLink = document.createElement("a")
 	downloadLink.download = fileNameToSaveAs
@@ -135,8 +203,30 @@ class Talos
 		@yaml = jsyaml.load(@story.yml)
 		if @yaml.title?
 			@src += "<h1 style='font-size: 2.5em; text-align: center'>#{@yaml.title}</h1>\n\n"
+		else
+			@yaml.title = "Sin Título"
+		
 		if @yaml.author?
 			@src += "<h1 style='font-style: italic; text-align: center;margin-bottom: 2em;'>#{@yaml.author}</h1>\n\n"
+		else
+			@yaml.author = "Anónimo"
+
+		if !@yaml.lang?
+			@yaml.lang = "es"
+		
+		if !@yaml.publisher?
+			@yaml.publisher = ""
+
+		if !@yaml.description?
+			@yaml.description = ""
+
+		if !@yaml.tags?
+			@yaml.tags = []
+
+		if !@yaml.turn_to?
+			@yaml.turn_to = ''
+		else
+			@yaml.turn_to = " #{@yaml.turn_to} "
 		
 		# GUARDAR SECCIONES FIJAS Y SU INDICE
 		fixedSections = []
@@ -208,7 +298,7 @@ class Talos
 							number = searchElem(sec, mapSections)
 						else
 							number = content
-						line=line.replaceAll(sec, "[#{number}](##{number})")
+						line=line.replaceAll(sec, "#{@yaml.turn_to}[#{number}](##{number})")
 				@story.blocks[index].lines[indexL] = line
 				indexL++
 			index++
@@ -230,11 +320,11 @@ class Talos
 						else
 							return -1)
 					for els in elsNorm
-						@src+="<h1 id='#{els.name}' style='text-align: center;'>#{els.name}</h1>\n\n"
+						@src+="<h1 id='#{els.name}' name='#{els.name}' style='text-align: center;'>#{els.name}</h1>\n\n"
 						for line in els.lines
 							@src+="#{line}\n"
 				elsNorm = []
-				@src+="<h1 id='#{el.name}' style='text-align: center;'>#{el.name}</h1>\n\n"
+				@src+="<h1 id='#{el.name}' name='#{el.name}' style='text-align: center;'>#{el.name}</h1>\n\n"
 				for line in el.lines
 					@src+="#{line}\n"
 			else if el.type is "normal"
@@ -247,12 +337,20 @@ class Talos
 		# CONVERTIR MARKDOWN A HTML
 		html = @converter.render(@src)
 
-		# CONVERTIR HTML A RTF, y guardar como *.rtf
+		# GUARDAR EN DISTINTOS FORMATOS
 		if @yaml.output?
-			if @yaml.output is 'rtf'
-				saveTextFile(toRTF(html), 'rtf')
+			if @yaml.output is 'pdf'
+				toPDF(html, @yaml)
+			else if @yaml.output is 'html'
+				saveTextFile(toHTML(html, @yaml), @yaml,'html')
+			else if @yaml.output is 'epub'
+				toEPUB(html,@yaml)
+			else if @yaml.output is 'docx'
+				toDOCX(html,@yaml)
+			else
+				console.log("El formato de salida *.#{@yaml.output} no está soportado por Talos.\n\nLos formatos soportados son: html, epub, docx y pdf.")
 		else
-			saveTextFile(toRTF(html), 'rtf')
+			saveTextFile(toHTML(html, @yaml), @yaml,'html')
 
 
 

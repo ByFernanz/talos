@@ -1,6 +1,9 @@
 ---
 title: Pangamebook Gamebook Example
 author: Pelle Nilsson
+#[html, epub, docx, pdf]
+output: docx
+turn_to: ve al
 ---
 
 # Pangamebook Gamebook Example
