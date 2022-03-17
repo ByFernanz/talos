@@ -6,7 +6,8 @@ regexLib = {
   normal: /^[a-z][a-z_0-9]*\s{0,1}(.*)$/m,
   fixed: /^[0-9]+\s{0,1}(.*)$/m,
   ignored: /^[A-Z].*$/m,
-  link: /\[([^\[\]]+)\](?!\(|\:|{)/gm
+  link: /\[([^\[\]]+)\](?!\(|\:|{)/gm,
+  div: /^(\:{3,}).*/m
 };
 
 parseText = function(text) {
@@ -215,8 +216,8 @@ saveTextFile = function(doc, meta, ext) {
 };
 
 Talos = class Talos {
-  constructor(story, settings) {
-    this.story = story;
+  constructor(storySrc, settings) {
+    this.storySrc = storySrc;
     this.settings = settings;
     this.converter = new markdownit({
       html: true
@@ -225,18 +226,19 @@ Talos = class Talos {
     this.info = $("#talos-info");
     this.keywords = {};
     this.history = {};
-    this.yaml;
+    this.yaml = null;
     this.src = "";
     this.currentSection = null;
+    this.story = {};
   }
 
   /*
-   * Configuracion del compilador
+   * Configuracion del compilador cuando este terminado
   @settings.type = [classic, automated]
   @settings.mode = [book, app]
   @setting.appMode = [page, scroll]
   @settings.sections = [numbered, titled]
-  @settings.output = [html,rtf]
+  @settings.output = [html,docx,epub, pdf]
    */
   play() {
     /*
@@ -245,14 +247,20 @@ Talos = class Talos {
     return console.log("test");
   }
 
-  compile() {
-    var content, count, currentSection, diff, el, els, elsNorm, fix, fixedSections, h, html, i, index, indexFix, indexL, j, k, l, len, len1, len10, len11, len12, len2, len3, len4, len5, len6, len7, len8, len9, line, linkedH, linkedS, listH, m, mapSections, matches, max, min, n, newlines, num, number, o, orphans, p, q, ref, ref1, ref2, ref3, ref4, ref5, ref6, ref7, rev, s, sec, t, u, v;
+  compile(preview = "") {
+    var content, count, currentSection, diff, el, els, elsNorm, fix, fixedSections, h, html, i, index, indexFix, indexL, j, k, l, len, len1, len10, len11, len12, len13, len14, len15, len2, len3, len4, len5, len6, len7, len8, len9, line, linkedH, linkedS, listH, m, mapSections, matches, max, min, n, newlines, num, number, o, orphans, p, q, ref, ref1, ref2, ref3, ref4, ref5, ref6, ref7, ref8, ref9, rev, s, sec, t, u, v, w, x, y;
     /*
     retornara un informe de errores y un archivo para descargar
     */
-    // LIMPIAR CONSOLA DE INFORMACION
+    // REINICIAR VARIABLES
+    this.info.html(`${this.info.html()}<span><i>[0/8] Estableciendo configuración inicial...</i></span></br>`);
+    this.story = JSON.parse(JSON.stringify(this.storySrc));
     this.info.html("");
+    html = "";
+    this.yaml = null;
+    this.src = "";
     // PROCESAMIENTO DE YML
+    this.info.html(`${this.info.html()}<span><i>[1/8] Procesando cabecera del documento...</i></span></br>`);
     this.yaml = jsyaml.load(this.story.yml);
     if (this.yaml.title != null) {
       this.src += `<h1 style='font-size: 2.5em; text-align: center'>${this.yaml.title}</h1>\n\n`;
@@ -283,6 +291,7 @@ Talos = class Talos {
     }
     
     // GUARDAR SECCIONES FIJAS Y SU INDICE
+    this.info.html(`${this.info.html()}<span><i>[2/8] Recolectando secciones fijas...</i></span></br>`);
     fixedSections = [];
     currentSection = null;
     index = 0;
@@ -298,8 +307,25 @@ Talos = class Talos {
       }
       index++;
     }
+    // REMOVIENDO DIVS
+    index = 0;
+    ref1 = this.story.blocks;
+    for (j = 0, len1 = ref1.length; j < len1; j++) {
+      el = ref1[j];
+      indexL = 0;
+      ref2 = el.lines;
+      for (k = 0, len2 = ref2.length; k < len2; k++) {
+        line = ref2[k];
+        if (line.match(regexLib.div) != null) {
+          this.story.blocks[index].lines[indexL] = "";
+        }
+        indexL++;
+      }
+      index++;
+    }
     
     // ASIGNAR NUMEROS ALEATORIOS A LA SECCIONES
+    this.info.html(`${this.info.html()}<span><i>[3/8] Asignando números aleatorios a las secciones no numeradas...</i></span></br>`);
     listH = []; //guarda la lista total de encabezados
     mapSections = [];
     currentSection = null;
@@ -310,10 +336,17 @@ Talos = class Talos {
     max = 0;
     num = [];
     rev = 0;
-    ref1 = this.story.blocks;
-    for (j = 0, len1 = ref1.length; j < len1; j++) {
-      el = ref1[j];
+    ref3 = this.story.blocks;
+    for (l = 0, len3 = ref3.length; l < len3; l++) {
+      el = ref3[l];
       if (el.type === 'fixed') {
+        for (m = 0, len4 = listH.length; m < len4; m++) {
+          h = listH[m];
+          if (h === el.name) {
+            this.info.html(`${this.info.html()}<span style='color: darkred;'>ERROR: El nombre de la sección <b>${el.name}</b> se repite en otra sección.</span><br/>`);
+            return this.info.text();
+          }
+        }
         listH.push(el.name); //guardar nombre
         if (fixedSections[indexFix].number === parseInt(el.name)) {
           if (fixedSections[indexFix + 1] != null) {
@@ -329,7 +362,7 @@ Talos = class Talos {
               this.info.html(`${this.info.html()}<span style='color: darkred;'>ERROR: La cantidad de secciones anteriores a <b>${max}</b> le superan por ${rev - max}.</span><br/>`);
               return this.info.text();
             } else if (max > rev) {
-              this.info.html(`${this.info.html()}<span style='color: darkyellow;'>ADVERTENCIA: La cantidad de secciones anteriores a <b>${max}</b> son insuficientes, faltan ${max - rev}.</span><br/>`);
+              this.info.html(`${this.info.html()}<span style='color: darkgoldenrod;'>ADVERTENCIA: La cantidad de secciones anteriores a <b>${max}</b> son insuficientes, faltan ${max - rev}.</span><br/>`);
             }
           } else {
             diff = this.story.blocks.length - fixedSections[indexFix].number;
@@ -344,6 +377,10 @@ Talos = class Talos {
         }
         indexFix++;
       } else if (el.type === 'normal') {
+        if (h === el.name) {
+          this.info.html(`${this.info.html()}<span style='color: darkred;'>ERROR: El nombre de la sección <b>${el.name}</b> se repite en otra sección.</span><br/>`);
+          return this.info.text();
+        }
         listH.push(el.name); //guardar nombre
         fix = randomNum(0, num.length);
         currentSection = {
@@ -359,33 +396,34 @@ Talos = class Talos {
     }
     
     // CAMBIAR POR NUMEROS LOS ENLACES
+    this.info.html(`${this.info.html()}<span><i>[4/8] Reasignando enlaces a las secciones numeradas...</i></span></br>`);
     index = 0;
     // Para guardar las secciones enlazadas
     linkedH = {};
-    ref2 = this.story.blocks;
-    for (k = 0, len2 = ref2.length; k < len2; k++) {
-      el = ref2[k];
+    ref4 = this.story.blocks;
+    for (n = 0, len5 = ref4.length; n < len5; n++) {
+      el = ref4[n];
       indexL = 0;
       newlines = [];
-      ref3 = el.lines;
-      for (l = 0, len3 = ref3.length; l < len3; l++) {
-        line = ref3[l];
+      ref5 = el.lines;
+      for (o = 0, len6 = ref5.length; o < len6; o++) {
+        line = ref5[o];
         matches = line.match(regexLib.link);
         if (matches != null) {
-          for (m = 0, len4 = matches.length; m < len4; m++) {
-            sec = matches[m];
+          for (p = 0, len7 = matches.length; p < len7; p++) {
+            sec = matches[p];
             content = sec.replace("[", "");
             content = content.replace("]", "");
             linkedH[`${content}`] = true;
             linkedS = false; // Para determinar si existe el objetivo del enlace
-            for (n = 0, len5 = listH.length; n < len5; n++) {
-              h = listH[n];
+            for (q = 0, len8 = listH.length; q < len8; q++) {
+              h = listH[q];
               if (h === content) {
                 linkedS = true;
               }
             }
             if (!linkedS) {
-              this.info.html(`${this.info.html()}<span style='color: darkyellow;'>ADVERTENCIA: La sección <b>${content}</b>  a la que apunta <b>${el.name}</b> no existe.</span><br/>`);
+              this.info.html(`${this.info.html()}<span style='color: darkgoldenrod;'>ADVERTENCIA: La sección <b>${content}</b>  a la que apunta <b>${el.name}</b> no existe.</span><br/>`);
             }
             if (isNaN(content)) {
               number = searchElem(sec, mapSections);
@@ -401,32 +439,34 @@ Talos = class Talos {
       index++;
     }
     // REVISAR SI ALGUNA SECCION SE ENCUENTRA NO ENLAZADA
+    this.info.html(`${this.info.html()}<span><i>[5/8] Examinando si hay secciones huérfanas...</i></span></br>`);
     orphans = [];
-    for (o = 0, len6 = listH.length; o < len6; o++) {
-      sec = listH[o];
+    for (s = 0, len9 = listH.length; s < len9; s++) {
+      sec = listH[s];
       if (!linkedH[sec]) {
         orphans.push(sec);
       }
     }
     if (orphans) {
-      for (p = 0, len7 = orphans.length; p < len7; p++) {
-        sec = orphans[p];
+      for (t = 0, len10 = orphans.length; t < len10; t++) {
+        sec = orphans[t];
         if (sec !== '1') {
-          this.info.html(`${this.info.html()}<span style='color: darkyellow;'>ADVERTENCIA: Ningún enlace apunta a la sección <b>${sec}</b>.</span><br/>`);
+          this.info.html(`${this.info.html()}<span style='color: darkgoldenrod;'>ADVERTENCIA: Ningún enlace apunta a la sección <b>${sec}</b>.</span><br/>`);
         }
       }
     }
     // ORDENAR E IMPRIMIR EN EL SRC
+    this.info.html(`${this.info.html()}<span><i>[6/8] Organizando las secciones en orden secuencial...</i></span></br>`);
     index = 0;
     elsNorm = [];
-    ref4 = this.story.blocks;
-    for (q = 0, len8 = ref4.length; q < len8; q++) {
-      el = ref4[q];
+    ref6 = this.story.blocks;
+    for (u = 0, len11 = ref6.length; u < len11; u++) {
+      el = ref6[u];
       if (el.type === "ignored") {
         this.src += `<h1 style='text-align: center;'>${el.name}</h1>\n\n`;
-        ref5 = el.lines;
-        for (s = 0, len9 = ref5.length; s < len9; s++) {
-          line = ref5[s];
+        ref7 = el.lines;
+        for (v = 0, len12 = ref7.length; v < len12; v++) {
+          line = ref7[v];
           this.src += `${line}\n`;
         }
       } else if (el.type === "fixed") {
@@ -438,21 +478,21 @@ Talos = class Talos {
               return -1;
             }
           });
-          for (t = 0, len10 = elsNorm.length; t < len10; t++) {
-            els = elsNorm[t];
+          for (w = 0, len13 = elsNorm.length; w < len13; w++) {
+            els = elsNorm[w];
             this.src += `<h1 id='${els.name}' name='${els.name}' style='text-align: center;'>${els.name}</h1>\n\n`;
-            ref6 = els.lines;
-            for (u = 0, len11 = ref6.length; u < len11; u++) {
-              line = ref6[u];
+            ref8 = els.lines;
+            for (x = 0, len14 = ref8.length; x < len14; x++) {
+              line = ref8[x];
               this.src += `${line}\n`;
             }
           }
         }
         elsNorm = [];
         this.src += `<h1 id='${el.name}' name='${el.name}' style='text-align: center;'>${el.name}</h1>\n\n`;
-        ref7 = el.lines;
-        for (v = 0, len12 = ref7.length; v < len12; v++) {
-          line = ref7[v];
+        ref9 = el.lines;
+        for (y = 0, len15 = ref9.length; y < len15; y++) {
+          line = ref9[y];
           this.src += `${line}\n`;
         }
       } else if (el.type === "normal") {
@@ -463,8 +503,18 @@ Talos = class Talos {
     }
     
     // CONVERTIR MARKDOWN A HTML
+    this.info.html(`${this.info.html()}<span><i>[7/8] Renderizando documento...</i></span></br>`);
     html = this.converter.render(this.src);
+    // SI SOLO ES PARA PREVIEW
+    if (preview === 'preview') {
+      this.info.html(`${this.info.html()}<span><i>[8/8] Visualizando documento en vista previa...</i></span></br>`);
+      return html;
+    } else if (preview === 'review') {
+      this.info.html(`${this.info.html()}<span><i>[8/8] Compilación exitosa...</i></span></br>`);
+      return html;
+    }
     // GUARDAR EN DISTINTOS FORMATOS
+    this.info.html(`${this.info.html()}<span><i>[8/8] Exportando el documento a formato <b>${this.yaml.output}</b>...</i></span></br>`);
     if (this.yaml.output != null) {
       if (this.yaml.output === 'pdf') {
         return toPDF(html, this.yaml);

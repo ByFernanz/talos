@@ -4,7 +4,8 @@ regexLib =
 	normal: /^[a-z][a-z_0-9]*\s{0,1}(.*)$/m,
 	fixed: /^[0-9]+\s{0,1}(.*)$/m,
 	ignored: /^[A-Z].*$/m,
-	link:  /\[([^\[\]]+)\](?!\(|\:|{)/gm
+	link:  /\[([^\[\]]+)\](?!\(|\:|{)/gm,
+	div: /^(\:{3,}).*/m
 
 parseText = (text) ->
 	lines = text.split /\n|\r\n/
@@ -166,7 +167,7 @@ saveTextFile = (doc, meta, ext) ->
 
 class Talos
 	constructor: (
-		@story,
+		@storySrc,
 		@settings
 	) ->
 		@converter = new markdownit({html: true})
@@ -174,17 +175,19 @@ class Talos
 		@info = $("#talos-info")
 		@keywords = {}
 		@history = {}
-		@yaml
+		@yaml = null
 		@src = ""
 		@currentSection = null
+		@story = {}
+		
 
 		###
-		# Configuracion del compilador
+		# Configuracion del compilador cuando este terminado
 		@settings.type = [classic, automated]
 		@settings.mode = [book, app]
 		@setting.appMode = [page, scroll]
 		@settings.sections = [numbered, titled]
-		@settings.output = [html,rtf]
+		@settings.output = [html,docx,epub, pdf]
 		###
 
 	play: ->
@@ -193,15 +196,21 @@ class Talos
 		###
 		console.log "test"
 	
-	compile: ->
+	compile: ( preview = "" ) ->
 		###
 		retornara un informe de errores y un archivo para descargar
 		###
 
-		# LIMPIAR CONSOLA DE INFORMACION
+		# REINICIAR VARIABLES
+		@info.html "#{@info.html()}<span><i>[0/8] Estableciendo configuración inicial...</i></span></br>"
+		@story = JSON.parse(JSON.stringify(@storySrc))
 		@info.html ""
+		html = ""
+		@yaml = null
+		@src = ""
 
 		# PROCESAMIENTO DE YML
+		@info.html "#{@info.html()}<span><i>[1/8] Procesando cabecera del documento...</i></span></br>"
 		@yaml = jsyaml.load(@story.yml)
 		if @yaml.title?
 			@src += "<h1 style='font-size: 2.5em; text-align: center'>#{@yaml.title}</h1>\n\n"
@@ -231,6 +240,7 @@ class Talos
 			@yaml.turn_to = " #{@yaml.turn_to} "
 		
 		# GUARDAR SECCIONES FIJAS Y SU INDICE
+		@info.html "#{@info.html()}<span><i>[2/8] Recolectando secciones fijas...</i></span></br>"
 		fixedSections = []
 		currentSection = null
 		index = 0
@@ -241,8 +251,19 @@ class Talos
 					number:  parseInt el.name
 				fixedSections.push currentSection
 			index++
+
+		# REMOVIENDO DIVS
+		index = 0
+		for el in @story.blocks
+			indexL = 0
+			for line in el.lines
+				if line.match(regexLib.div)?
+					@story.blocks[index].lines[indexL] = ""
+				indexL++
+			index++
 		
 		# ASIGNAR NUMEROS ALEATORIOS A LA SECCIONES
+		@info.html "#{@info.html()}<span><i>[3/8] Asignando números aleatorios a las secciones no numeradas...</i></span></br>"
 		listH = [] #guarda la lista total de encabezados
 		mapSections = []
 		currentSection = null
@@ -255,6 +276,10 @@ class Talos
 		rev = 0
 		for el in @story.blocks
 			if el.type is 'fixed'
+				for h in listH
+					if h is el.name
+						@info.html "#{@info.html()}<span style='color: darkred;'>ERROR: El nombre de la sección <b>#{el.name}</b> se repite en otra sección.</span><br/>"
+						return @info.text()
 				listH.push el.name #guardar nombre
 				if fixedSections[indexFix].number is parseInt el.name
 					if fixedSections[indexFix + 1]?
@@ -270,7 +295,7 @@ class Talos
 							@info.html "#{@info.html()}<span style='color: darkred;'>ERROR: La cantidad de secciones anteriores a <b>#{max}</b> le superan por #{rev - max}.</span><br/>"
 							return @info.text()
 						else if max > rev
-							@info.html "#{@info.html()}<span style='color: darkyellow;'>ADVERTENCIA: La cantidad de secciones anteriores a <b>#{max}</b> son insuficientes, faltan #{max - rev}.</span><br/>"
+							@info.html "#{@info.html()}<span style='color: darkgoldenrod;'>ADVERTENCIA: La cantidad de secciones anteriores a <b>#{max}</b> son insuficientes, faltan #{max - rev}.</span><br/>"
 					else	
 						diff = @story.blocks.length - fixedSections[indexFix].number
 						max = @story.blocks.length
@@ -281,6 +306,9 @@ class Talos
 						count++	
 				indexFix++
 			else if el.type is 'normal'
+					if h is el.name
+						@info.html "#{@info.html()}<span style='color: darkred;'>ERROR: El nombre de la sección <b>#{el.name}</b> se repite en otra sección.</span><br/>"
+						return @info.text()
 					listH.push el.name #guardar nombre
 					fix = randomNum(0, num.length)
 					currentSection =
@@ -294,6 +322,7 @@ class Talos
 
 			
 		# CAMBIAR POR NUMEROS LOS ENLACES
+		@info.html "#{@info.html()}<span><i>[4/8] Reasignando enlaces a las secciones numeradas...</i></span></br>"
 		index = 0
 		# Para guardar las secciones enlazadas
 		linkedH = {}
@@ -312,7 +341,7 @@ class Talos
 							if h is content
 								linkedS = true
 						if !linkedS
-							@info.html "#{@info.html()}<span style='color: darkyellow;'>ADVERTENCIA: La sección <b>#{content}</b>  a la que apunta <b>#{el.name}</b> no existe.</span><br/>"
+							@info.html "#{@info.html()}<span style='color: darkgoldenrod;'>ADVERTENCIA: La sección <b>#{content}</b>  a la que apunta <b>#{el.name}</b> no existe.</span><br/>"
 
 						if isNaN(content)
 							number = searchElem(sec, mapSections)
@@ -324,6 +353,7 @@ class Talos
 			index++
 
 		# REVISAR SI ALGUNA SECCION SE ENCUENTRA NO ENLAZADA
+		@info.html "#{@info.html()}<span><i>[5/8] Examinando si hay secciones huérfanas...</i></span></br>"
 		orphans = []
 		for sec in listH
 			if !linkedH[sec]
@@ -331,11 +361,12 @@ class Talos
 		if orphans
 			for sec in orphans
 				if sec != '1'
-					@info.html "#{@info.html()}<span style='color: darkyellow;'>ADVERTENCIA: Ningún enlace apunta a la sección <b>#{sec}</b>.</span><br/>"
+					@info.html "#{@info.html()}<span style='color: darkgoldenrod;'>ADVERTENCIA: Ningún enlace apunta a la sección <b>#{sec}</b>.</span><br/>"
 
 
 
 		# ORDENAR E IMPRIMIR EN EL SRC
+		@info.html "#{@info.html()}<span><i>[6/8] Organizando las secciones en orden secuencial...</i></span></br>"
 		index = 0
 		elsNorm = []
 		for el in @story.blocks
@@ -365,9 +396,19 @@ class Talos
 		
 
 		# CONVERTIR MARKDOWN A HTML
+		@info.html "#{@info.html()}<span><i>[7/8] Renderizando documento...</i></span></br>"
 		html = @converter.render(@src)
 
+		# SI SOLO ES PARA PREVIEW
+		if preview is 'preview'
+			@info.html "#{@info.html()}<span><i>[8/8] Visualizando documento en vista previa...</i></span></br>"
+			return html
+		else if preview is 'review'
+			@info.html "#{@info.html()}<span><i>[8/8] Compilación exitosa...</i></span></br>"
+			return html
+
 		# GUARDAR EN DISTINTOS FORMATOS
+		@info.html "#{@info.html()}<span><i>[8/8] Exportando el documento a formato <b>#{@yaml.output}</b>...</i></span></br>"
 		if @yaml.output?
 			if @yaml.output is 'pdf'
 				toPDF(html, @yaml)

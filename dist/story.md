@@ -45,7 +45,8 @@ and many other useful things in Pandoc Markdown files? There are no examples of
 that here, but it can be useful to know. Guess the story ends here as there are
 no links going out from this section.
 
-# cuatro
+::::::::: hola_mundo ::::::::::::
+# diez
 nananananna
 
 # 5
@@ -59,6 +60,7 @@ numbers like this, but it can be used to keep sections grouped.
 If you add two more sections before this there will be an
 error, because there is not room for four sections between
 1 and 5.
+::::::::::::::::::::::::::::::::::
 
 # some_other_section
 This is just to continue the example with something after
