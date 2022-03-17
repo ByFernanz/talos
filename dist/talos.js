@@ -100,8 +100,6 @@ searchElem = function(sec, mapSections) {
     name = `[${el.name}]`;
     if (name === sec) {
       if (el != null) {
-        console.log(el.name);
-        console.log(el.number);
         return el.number;
       }
     }
@@ -224,6 +222,7 @@ Talos = class Talos {
       html: true
     });
     this.container = $("#talos-play");
+    this.info = $("#talos-info");
     this.keywords = {};
     this.history = {};
     this.yaml;
@@ -247,10 +246,12 @@ Talos = class Talos {
   }
 
   compile() {
-    var content, count, currentSection, diff, el, els, elsNorm, fix, fixedSections, html, i, index, indexFix, indexL, j, k, l, len, len1, len2, len3, len4, len5, len6, len7, len8, len9, line, m, mapSections, matches, max, min, n, newlines, num, number, o, p, q, ref, ref1, ref2, ref3, ref4, ref5, ref6, ref7, rev, s, sec;
+    var content, count, currentSection, diff, el, els, elsNorm, fix, fixedSections, h, html, i, index, indexFix, indexL, j, k, l, len, len1, len10, len11, len12, len2, len3, len4, len5, len6, len7, len8, len9, line, linkedH, linkedS, listH, m, mapSections, matches, max, min, n, newlines, num, number, o, orphans, p, q, ref, ref1, ref2, ref3, ref4, ref5, ref6, ref7, rev, s, sec, t, u, v;
     /*
     retornara un informe de errores y un archivo para descargar
     */
+    // LIMPIAR CONSOLA DE INFORMACION
+    this.info.html("");
     // PROCESAMIENTO DE YML
     this.yaml = jsyaml.load(this.story.yml);
     if (this.yaml.title != null) {
@@ -299,6 +300,7 @@ Talos = class Talos {
     }
     
     // ASIGNAR NUMEROS ALEATORIOS A LA SECCIONES
+    listH = []; //guarda la lista total de encabezados
     mapSections = [];
     currentSection = null;
     index = 0;
@@ -312,6 +314,7 @@ Talos = class Talos {
     for (j = 0, len1 = ref1.length; j < len1; j++) {
       el = ref1[j];
       if (el.type === 'fixed') {
+        listH.push(el.name); //guardar nombre
         if (fixedSections[indexFix].number === parseInt(el.name)) {
           if (fixedSections[indexFix + 1] != null) {
             min = fixedSections[indexFix].number;
@@ -319,9 +322,14 @@ Talos = class Talos {
             // Diferencia de posicion en el index
             diff = (fixedSections[indexFix + 1].blockIndex - index) - 1;
             rev = min + diff + 1;
-            if (rev > max) {
-              console.log("ERROR: La cantidad de secciones supera el numero fijo");
-              break;
+            if (min > max) {
+              this.info.html(`${this.info.html()}<span style='color: darkred;'>ERROR: El numero de la sección <b>${min}</b> es mayor que el de la sección siguiente: <b>${max}</b>.</span><br/>`);
+              return this.info.text();
+            } else if (rev > max) {
+              this.info.html(`${this.info.html()}<span style='color: darkred;'>ERROR: La cantidad de secciones anteriores a <b>${max}</b> le superan por ${rev - max}.</span><br/>`);
+              return this.info.text();
+            } else if (max > rev) {
+              this.info.html(`${this.info.html()}<span style='color: darkyellow;'>ADVERTENCIA: La cantidad de secciones anteriores a <b>${max}</b> son insuficientes, faltan ${max - rev}.</span><br/>`);
             }
           } else {
             diff = this.story.blocks.length - fixedSections[indexFix].number;
@@ -336,6 +344,7 @@ Talos = class Talos {
         }
         indexFix++;
       } else if (el.type === 'normal') {
+        listH.push(el.name); //guardar nombre
         fix = randomNum(0, num.length);
         currentSection = {
           name: el.name,
@@ -351,6 +360,8 @@ Talos = class Talos {
     
     // CAMBIAR POR NUMEROS LOS ENLACES
     index = 0;
+    // Para guardar las secciones enlazadas
+    linkedH = {};
     ref2 = this.story.blocks;
     for (k = 0, len2 = ref2.length; k < len2; k++) {
       el = ref2[k];
@@ -365,6 +376,17 @@ Talos = class Talos {
             sec = matches[m];
             content = sec.replace("[", "");
             content = content.replace("]", "");
+            linkedH[`${content}`] = true;
+            linkedS = false; // Para determinar si existe el objetivo del enlace
+            for (n = 0, len5 = listH.length; n < len5; n++) {
+              h = listH[n];
+              if (h === content) {
+                linkedS = true;
+              }
+            }
+            if (!linkedS) {
+              this.info.html(`${this.info.html()}<span style='color: darkyellow;'>ADVERTENCIA: La sección <b>${content}</b>  a la que apunta <b>${el.name}</b> no existe.</span><br/>`);
+            }
             if (isNaN(content)) {
               number = searchElem(sec, mapSections);
             } else {
@@ -378,18 +400,33 @@ Talos = class Talos {
       }
       index++;
     }
-    console.log(this.story.blocks);
+    // REVISAR SI ALGUNA SECCION SE ENCUENTRA NO ENLAZADA
+    orphans = [];
+    for (o = 0, len6 = listH.length; o < len6; o++) {
+      sec = listH[o];
+      if (!linkedH[sec]) {
+        orphans.push(sec);
+      }
+    }
+    if (orphans) {
+      for (p = 0, len7 = orphans.length; p < len7; p++) {
+        sec = orphans[p];
+        if (sec !== '1') {
+          this.info.html(`${this.info.html()}<span style='color: darkyellow;'>ADVERTENCIA: Ningún enlace apunta a la sección <b>${sec}</b>.</span><br/>`);
+        }
+      }
+    }
     // ORDENAR E IMPRIMIR EN EL SRC
     index = 0;
     elsNorm = [];
     ref4 = this.story.blocks;
-    for (n = 0, len5 = ref4.length; n < len5; n++) {
-      el = ref4[n];
+    for (q = 0, len8 = ref4.length; q < len8; q++) {
+      el = ref4[q];
       if (el.type === "ignored") {
         this.src += `<h1 style='text-align: center;'>${el.name}</h1>\n\n`;
         ref5 = el.lines;
-        for (o = 0, len6 = ref5.length; o < len6; o++) {
-          line = ref5[o];
+        for (s = 0, len9 = ref5.length; s < len9; s++) {
+          line = ref5[s];
           this.src += `${line}\n`;
         }
       } else if (el.type === "fixed") {
@@ -401,12 +438,12 @@ Talos = class Talos {
               return -1;
             }
           });
-          for (p = 0, len7 = elsNorm.length; p < len7; p++) {
-            els = elsNorm[p];
+          for (t = 0, len10 = elsNorm.length; t < len10; t++) {
+            els = elsNorm[t];
             this.src += `<h1 id='${els.name}' name='${els.name}' style='text-align: center;'>${els.name}</h1>\n\n`;
             ref6 = els.lines;
-            for (q = 0, len8 = ref6.length; q < len8; q++) {
-              line = ref6[q];
+            for (u = 0, len11 = ref6.length; u < len11; u++) {
+              line = ref6[u];
               this.src += `${line}\n`;
             }
           }
@@ -414,8 +451,8 @@ Talos = class Talos {
         elsNorm = [];
         this.src += `<h1 id='${el.name}' name='${el.name}' style='text-align: center;'>${el.name}</h1>\n\n`;
         ref7 = el.lines;
-        for (s = 0, len9 = ref7.length; s < len9; s++) {
-          line = ref7[s];
+        for (v = 0, len12 = ref7.length; v < len12; v++) {
+          line = ref7[v];
           this.src += `${line}\n`;
         }
       } else if (el.type === "normal") {
@@ -424,7 +461,6 @@ Talos = class Talos {
       // como ordenar elementos renumerados
       index++;
     }
-    console.log(this.src);
     
     // CONVERTIR MARKDOWN A HTML
     html = this.converter.render(this.src);
@@ -439,7 +475,7 @@ Talos = class Talos {
       } else if (this.yaml.output === 'docx') {
         return toDOCX(html, this.yaml);
       } else {
-        return console.log(`El formato de salida *.${this.yaml.output} no está soportado por Talos.\n\nLos formatos soportados son: html, epub, docx y pdf.`);
+        return this.info.html(`${this.info.html}<span style='color: darkred;'>ERROR: El formato de salida <b>*.${this.yaml.output}</b> no está soportado por Talos. Pruebe con: html, epub, docx y pdf.</span></br>`);
       }
     } else {
       return saveTextFile(toHTML(html, this.yaml), this.yaml, 'html');

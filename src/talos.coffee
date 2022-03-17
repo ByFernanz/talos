@@ -73,8 +73,6 @@ searchElem = (sec, mapSections) ->
 		name = "[#{el.name}]"
 		if name is sec
 			if el?
-				console.log(el.name)
-				console.log(el.number)
 				return el.number
 
 toPDF = (html, meta) ->
@@ -173,6 +171,7 @@ class Talos
 	) ->
 		@converter = new markdownit({html: true})
 		@container = $("#talos-play")
+		@info = $("#talos-info")
 		@keywords = {}
 		@history = {}
 		@yaml
@@ -198,6 +197,9 @@ class Talos
 		###
 		retornara un informe de errores y un archivo para descargar
 		###
+
+		# LIMPIAR CONSOLA DE INFORMACION
+		@info.html ""
 
 		# PROCESAMIENTO DE YML
 		@yaml = jsyaml.load(@story.yml)
@@ -241,6 +243,7 @@ class Talos
 			index++
 		
 		# ASIGNAR NUMEROS ALEATORIOS A LA SECCIONES
+		listH = [] #guarda la lista total de encabezados
 		mapSections = []
 		currentSection = null
 		index = 0
@@ -252,6 +255,7 @@ class Talos
 		rev = 0
 		for el in @story.blocks
 			if el.type is 'fixed'
+				listH.push el.name #guardar nombre
 				if fixedSections[indexFix].number is parseInt el.name
 					if fixedSections[indexFix + 1]?
 						min = fixedSections[indexFix].number
@@ -259,10 +263,15 @@ class Talos
 						# Diferencia de posicion en el index
 						diff = (fixedSections[indexFix + 1].blockIndex - index) - 1
 						rev = min + diff + 1
-						if rev > max
-							console.log("ERROR: La cantidad de secciones supera el numero fijo")
-							break
-					else
+						if min > max
+							@info.html "#{@info.html()}<span style='color: darkred;'>ERROR: El numero de la sección <b>#{min}</b> es mayor que el de la sección siguiente: <b>#{max}</b>.</span><br/>"
+							return @info.text()
+						else if rev > max
+							@info.html "#{@info.html()}<span style='color: darkred;'>ERROR: La cantidad de secciones anteriores a <b>#{max}</b> le superan por #{rev - max}.</span><br/>"
+							return @info.text()
+						else if max > rev
+							@info.html "#{@info.html()}<span style='color: darkyellow;'>ADVERTENCIA: La cantidad de secciones anteriores a <b>#{max}</b> son insuficientes, faltan #{max - rev}.</span><br/>"
+					else	
 						diff = @story.blocks.length - fixedSections[indexFix].number
 						max = @story.blocks.length
 					count = min + 1
@@ -272,6 +281,7 @@ class Talos
 						count++	
 				indexFix++
 			else if el.type is 'normal'
+					listH.push el.name #guardar nombre
 					fix = randomNum(0, num.length)
 					currentSection =
 						name: el.name
@@ -285,6 +295,8 @@ class Talos
 			
 		# CAMBIAR POR NUMEROS LOS ENLACES
 		index = 0
+		# Para guardar las secciones enlazadas
+		linkedH = {}
 		for el in @story.blocks
 			indexL = 0
 			newlines = []
@@ -294,6 +306,14 @@ class Talos
 					for sec in matches
 						content = sec.replace("[","")
 						content = content.replace("]","")
+						linkedH["#{content}"] = true
+						linkedS = false # Para determinar si existe el objetivo del enlace
+						for h in listH
+							if h is content
+								linkedS = true
+						if !linkedS
+							@info.html "#{@info.html()}<span style='color: darkyellow;'>ADVERTENCIA: La sección <b>#{content}</b>  a la que apunta <b>#{el.name}</b> no existe.</span><br/>"
+
 						if isNaN(content)
 							number = searchElem(sec, mapSections)
 						else
@@ -302,7 +322,18 @@ class Talos
 				@story.blocks[index].lines[indexL] = line
 				indexL++
 			index++
-		console.log(@story.blocks)
+
+		# REVISAR SI ALGUNA SECCION SE ENCUENTRA NO ENLAZADA
+		orphans = []
+		for sec in listH
+			if !linkedH[sec]
+				orphans.push sec
+		if orphans
+			for sec in orphans
+				if sec != '1'
+					@info.html "#{@info.html()}<span style='color: darkyellow;'>ADVERTENCIA: Ningún enlace apunta a la sección <b>#{sec}</b>.</span><br/>"
+
+
 
 		# ORDENAR E IMPRIMIR EN EL SRC
 		index = 0
@@ -331,7 +362,6 @@ class Talos
 				elsNorm.push el
 				# como ordenar elementos renumerados
 			index++
-		console.log(@src)
 		
 
 		# CONVERTIR MARKDOWN A HTML
@@ -348,7 +378,7 @@ class Talos
 			else if @yaml.output is 'docx'
 				toDOCX(html,@yaml)
 			else
-				console.log("El formato de salida *.#{@yaml.output} no está soportado por Talos.\n\nLos formatos soportados son: html, epub, docx y pdf.")
+				@info.html "#{@info.html}<span style='color: darkred;'>ERROR: El formato de salida <b>*.#{@yaml.output}</b> no está soportado por Talos. Pruebe con: html, epub, docx y pdf.</span></br>"
 		else
 			saveTextFile(toHTML(html, @yaml), @yaml,'html')
 

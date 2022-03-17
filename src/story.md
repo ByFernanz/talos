@@ -45,6 +45,9 @@ and many other useful things in Pandoc Markdown files? There are no examples of
 that here, but it can be useful to know. Guess the story ends here as there are
 no links going out from this section.
 
+# cuatro
+nananananna
+
 # 5
 Another header that is already a number. If you paid attention to
 the description in the [README](README.md) you know that this
@@ -62,13 +65,15 @@ This is just to continue the example with something after
 section [5] that was fixed, and that this should always
 have number 6 or higher. The story ends in section [10].
 
-# unreached
-There are not links to this section, but it should still
-show up.
+# ocho
+nanana
+
+# nueve
+nananana
 
 # 10
 This ends the story. Most books have a best ending that has
-the highest number in the book. Setting this to 10 here leaves
+the highest number in the book. Setting [11] this to 10 here leaves
 some margins if a few more sections are added before.
 
 # Epilogue
