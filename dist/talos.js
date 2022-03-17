@@ -216,19 +216,15 @@ saveTextFile = function(doc, meta, ext) {
 };
 
 Talos = class Talos {
-  constructor(storySrc, settings) {
+  constructor(storySrc, info, settings) {
     this.storySrc = storySrc;
+    this.info = info;
     this.settings = settings;
     this.converter = new markdownit({
       html: true
     });
-    this.container = $("#talos-play");
-    this.info = $("#talos-info");
-    this.keywords = {};
-    this.history = {};
     this.yaml = null;
     this.src = "";
-    this.currentSection = null;
     this.story = {};
   }
 
@@ -240,22 +236,15 @@ Talos = class Talos {
   @settings.sections = [numbered, titled]
   @settings.output = [html,docx,epub, pdf]
    */
-  play() {
-    /*
-    reproducira el juego en el contenedor para testear
-    */
-    return console.log("test");
-  }
-
   compile(preview = "") {
-    var content, count, currentSection, diff, el, els, elsNorm, fix, fixedSections, h, html, i, index, indexFix, indexL, j, k, l, len, len1, len10, len11, len12, len13, len14, len15, len2, len3, len4, len5, len6, len7, len8, len9, line, linkedH, linkedS, listH, m, mapSections, matches, max, min, n, newlines, num, number, o, orphans, p, q, ref, ref1, ref2, ref3, ref4, ref5, ref6, ref7, ref8, ref9, rev, s, sec, t, u, v, w, x, y;
+    var content, count, currentSection, diff, el, els, elsNorm, fix, fixedSections, h, h1, h2, html, i, index, index2, indexFix, indexL, j, k, l, len, len1, len10, len11, len12, len13, len14, len15, len16, len2, len3, len4, len5, len6, len7, len8, len9, line, linkedH, linkedS, listH, listH2, m, mapSections, matches, max, min, n, newlines, num, number, o, orphans, p, q, ref, ref1, ref2, ref3, ref4, ref5, ref6, ref7, ref8, ref9, rev, s, sec, t, u, v, w, x, y, z;
     /*
     retornara un informe de errores y un archivo para descargar
     */
     // REINICIAR VARIABLES
+    this.info.html("");
     this.info.html(`${this.info.html()}<span><i>[0/8] Estableciendo configuración inicial...</i></span></br>`);
     this.story = JSON.parse(JSON.stringify(this.storySrc));
-    this.info.html("");
     html = "";
     this.yaml = null;
     this.src = "";
@@ -340,13 +329,6 @@ Talos = class Talos {
     for (l = 0, len3 = ref3.length; l < len3; l++) {
       el = ref3[l];
       if (el.type === 'fixed') {
-        for (m = 0, len4 = listH.length; m < len4; m++) {
-          h = listH[m];
-          if (h === el.name) {
-            this.info.html(`${this.info.html()}<span style='color: darkred;'>ERROR: El nombre de la sección <b>${el.name}</b> se repite en otra sección.</span><br/>`);
-            return this.info.text();
-          }
-        }
         listH.push(el.name); //guardar nombre
         if (fixedSections[indexFix].number === parseInt(el.name)) {
           if (fixedSections[indexFix + 1] != null) {
@@ -357,10 +339,10 @@ Talos = class Talos {
             rev = min + diff + 1;
             if (min > max) {
               this.info.html(`${this.info.html()}<span style='color: darkred;'>ERROR: El numero de la sección <b>${min}</b> es mayor que el de la sección siguiente: <b>${max}</b>.</span><br/>`);
-              return this.info.text();
+              return `ERROR: El numero de la sección ${min} es mayor que el de la sección siguiente: ${max}.`;
             } else if (rev > max) {
               this.info.html(`${this.info.html()}<span style='color: darkred;'>ERROR: La cantidad de secciones anteriores a <b>${max}</b> le superan por ${rev - max}.</span><br/>`);
-              return this.info.text();
+              return `ERROR: La cantidad de secciones anteriores a ${max} le superan por ${rev - max}.`;
             } else if (max > rev) {
               this.info.html(`${this.info.html()}<span style='color: darkgoldenrod;'>ADVERTENCIA: La cantidad de secciones anteriores a <b>${max}</b> son insuficientes, faltan ${max - rev}.</span><br/>`);
             }
@@ -377,10 +359,6 @@ Talos = class Talos {
         }
         indexFix++;
       } else if (el.type === 'normal') {
-        if (h === el.name) {
-          this.info.html(`${this.info.html()}<span style='color: darkred;'>ERROR: El nombre de la sección <b>${el.name}</b> se repite en otra sección.</span><br/>`);
-          return this.info.text();
-        }
         listH.push(el.name); //guardar nombre
         fix = randomNum(0, num.length);
         currentSection = {
@@ -395,29 +373,47 @@ Talos = class Talos {
       index++;
     }
     
+    // REVISAR SI SE REPITE UN ENCABEZADO
+    index = 0;
+    index2 = 0;
+    listH2 = listH;
+    for (m = 0, len4 = listH.length; m < len4; m++) {
+      h1 = listH[m];
+      index2 = 0;
+      for (n = 0, len5 = listH2.length; n < len5; n++) {
+        h2 = listH2[n];
+        if (h1 === h2 && index !== index2) {
+          this.info.html(`${this.info.html()}<span style='color: darkred;'>ERROR: El nombre de la sección <b>${h1}</b> se repite en otra sección.</span><br/>`);
+          return `ERROR: El nombre de la sección ${h1} se repite en otra sección.`;
+        }
+        index2++;
+      }
+      index++;
+    }
+    
     // CAMBIAR POR NUMEROS LOS ENLACES
     this.info.html(`${this.info.html()}<span><i>[4/8] Reasignando enlaces a las secciones numeradas...</i></span></br>`);
     index = 0;
     // Para guardar las secciones enlazadas
     linkedH = {};
     ref4 = this.story.blocks;
-    for (n = 0, len5 = ref4.length; n < len5; n++) {
-      el = ref4[n];
+    for (o = 0, len6 = ref4.length; o < len6; o++) {
+      el = ref4[o];
       indexL = 0;
       newlines = [];
       ref5 = el.lines;
-      for (o = 0, len6 = ref5.length; o < len6; o++) {
-        line = ref5[o];
+      for (p = 0, len7 = ref5.length; p < len7; p++) {
+        line = ref5[p];
         matches = line.match(regexLib.link);
         if (matches != null) {
-          for (p = 0, len7 = matches.length; p < len7; p++) {
-            sec = matches[p];
+          for (q = 0, len8 = matches.length; q < len8; q++) {
+            sec = matches[q];
             content = sec.replace("[", "");
             content = content.replace("]", "");
             linkedH[`${content}`] = true;
             linkedS = false; // Para determinar si existe el objetivo del enlace
-            for (q = 0, len8 = listH.length; q < len8; q++) {
-              h = listH[q];
+            for (s = 0, len9 = listH.length; s < len9; s++) {
+              h = listH[s];
               if (h === content) {
                 linkedS = true;
               }
@@ -441,15 +437,15 @@ Talos = class Talos {
     // REVISAR SI ALGUNA SECCION SE ENCUENTRA NO ENLAZADA
     this.info.html(`${this.info.html()}<span><i>[5/8] Examinando si hay secciones huérfanas...</i></span></br>`);
     orphans = [];
-    for (s = 0, len9 = listH.length; s < len9; s++) {
-      sec = listH[s];
+    for (t = 0, len10 = listH.length; t < len10; t++) {
+      sec = listH[t];
       if (!linkedH[sec]) {
         orphans.push(sec);
       }
     }
     if (orphans) {
-      for (t = 0, len10 = orphans.length; t < len10; t++) {
-        sec = orphans[t];
+      for (u = 0, len11 = orphans.length; u < len11; u++) {
+        sec = orphans[u];
         if (sec !== '1') {
           this.info.html(`${this.info.html()}<span style='color: darkgoldenrod;'>ADVERTENCIA: Ningún enlace apunta a la sección <b>${sec}</b>.</span><br/>`);
         }
@@ -460,13 +456,13 @@ Talos = class Talos {
     index = 0;
     elsNorm = [];
     ref6 = this.story.blocks;
-    for (u = 0, len11 = ref6.length; u < len11; u++) {
-      el = ref6[u];
+    for (v = 0, len12 = ref6.length; v < len12; v++) {
+      el = ref6[v];
       if (el.type === "ignored") {
         this.src += `<h1 style='text-align: center;'>${el.name}</h1>\n\n`;
         ref7 = el.lines;
-        for (v = 0, len12 = ref7.length; v < len12; v++) {
-          line = ref7[v];
+        for (w = 0, len13 = ref7.length; w < len13; w++) {
+          line = ref7[w];
           this.src += `${line}\n`;
         }
       } else if (el.type === "fixed") {
@@ -478,12 +474,12 @@ Talos = class Talos {
               return -1;
             }
           });
-          for (w = 0, len13 = elsNorm.length; w < len13; w++) {
-            els = elsNorm[w];
+          for (x = 0, len14 = elsNorm.length; x < len14; x++) {
+            els = elsNorm[x];
             this.src += `<h1 id='${els.name}' name='${els.name}' style='text-align: center;'>${els.name}</h1>\n\n`;
             ref8 = els.lines;
-            for (x = 0, len14 = ref8.length; x < len14; x++) {
-              line = ref8[x];
+            for (y = 0, len15 = ref8.length; y < len15; y++) {
+              line = ref8[y];
               this.src += `${line}\n`;
             }
           }
@@ -491,8 +487,8 @@ Talos = class Talos {
         elsNorm = [];
         this.src += `<h1 id='${el.name}' name='${el.name}' style='text-align: center;'>${el.name}</h1>\n\n`;
         ref9 = el.lines;
-        for (y = 0, len15 = ref9.length; y < len15; y++) {
-          line = ref9[y];
+        for (z = 0, len16 = ref9.length; z < len16; z++) {
+          line = ref9[z];
           this.src += `${line}\n`;
         }
       } else if (el.type === "normal") {
@@ -525,7 +521,8 @@ Talos = class Talos {
       } else if (this.yaml.output === 'docx') {
         return toDOCX(html, this.yaml);
       } else {
-        return this.info.html(`${this.info.html}<span style='color: darkred;'>ERROR: El formato de salida <b>*.${this.yaml.output}</b> no está soportado por Talos. Pruebe con: html, epub, docx y pdf.</span></br>`);
+        this.info.html(`${this.info.html}<span style='color: darkred;'>ERROR: El formato de salida <b>*.${this.yaml.output}</b> no está soportado por Talos. Pruebe con: html, epub, docx y pdf.</span></br>`);
+        return `ERROR: El formato de salida *.${this.yaml.output} no está soportado por Talos. Pruebe con: html, epub, docx y pdf.`;
       }
     } else {
       return saveTextFile(toHTML(html, this.yaml), this.yaml, 'html');
