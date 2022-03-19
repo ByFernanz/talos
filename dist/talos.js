@@ -270,6 +270,9 @@ Talos = class Talos {
     if (this.yaml.description == null) {
       this.yaml.description = "";
     }
+    if (this.yaml.output == null) {
+      this.yaml.output = "html";
+    }
     if (this.yaml.tags == null) {
       this.yaml.tags = [];
     }
@@ -339,10 +342,10 @@ Talos = class Talos {
             rev = min + diff + 1;
             if (min > max) {
               this.info.html(`${this.info.html()}<span style='color: darkred;'>ERROR: El numero de la sección <b>${min}</b> es mayor que el de la sección siguiente: <b>${max}</b>.</span><br/>`);
-              return `ERROR: El numero de la sección ${min} es mayor que el de la sección siguiente: ${max}.`;
+              return `<span style='color: darkred;'>ERROR: El numero de la sección <b>${min}</b> es mayor que el de la sección siguiente: <b>${max}</b>.</span><br/>`;
             } else if (rev > max) {
               this.info.html(`${this.info.html()}<span style='color: darkred;'>ERROR: La cantidad de secciones anteriores a <b>${max}</b> le superan por ${rev - max}.</span><br/>`);
-              return `ERROR: La cantidad de secciones anteriores a ${max} le superan por ${rev - max}.`;
+              return `<span style='color: darkred;'>ERROR: La cantidad de secciones anteriores a <b>${max}</b> le superan por ${rev - max}.</span><br/>`;
             } else if (max > rev) {
               this.info.html(`${this.info.html()}<span style='color: darkgoldenrod;'>ADVERTENCIA: La cantidad de secciones anteriores a <b>${max}</b> son insuficientes, faltan ${max - rev}.</span><br/>`);
             }
@@ -384,7 +387,7 @@ Talos = class Talos {
         h2 = listH2[n];
         if (h1 === h2 && index !== index2) {
           this.info.html(`${this.info.html()}<span style='color: darkred;'>ERROR: El nombre de la sección <b>${h1}</b> se repite en otra sección.</span><br/>`);
-          return `ERROR: El nombre de la sección ${h1} se repite en otra sección.`;
+          return `<span style='color: darkred;'>ERROR: El nombre de la sección <b>${h1}</b> se repite en otra sección.</span><br/>`;
         }
         index2++;
       }
@@ -522,7 +525,7 @@ Talos = class Talos {
         return toDOCX(html, this.yaml);
       } else {
         this.info.html(`${this.info.html}<span style='color: darkred;'>ERROR: El formato de salida <b>*.${this.yaml.output}</b> no está soportado por Talos. Pruebe con: html, epub, docx y pdf.</span></br>`);
-        return `ERROR: El formato de salida *.${this.yaml.output} no está soportado por Talos. Pruebe con: html, epub, docx y pdf.`;
+        return `<span style='color: darkred;'>ERROR: El formato de salida <b>*.${this.yaml.output}</b> no está soportado por Talos. Pruebe con: html, epub, docx y pdf.</span></br>`;
       }
     } else {
       return saveTextFile(toHTML(html, this.yaml), this.yaml, 'html');

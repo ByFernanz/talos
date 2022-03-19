@@ -220,6 +220,9 @@ class Talos
 
 		if !@yaml.description?
 			@yaml.description = ""
+		
+		if !@yaml.output?
+			@yaml.output = "html"
 
 		if !@yaml.tags?
 			@yaml.tags = []
@@ -276,10 +279,10 @@ class Talos
 						rev = min + diff + 1
 						if min > max
 							@info.html "#{@info.html()}<span style='color: darkred;'>ERROR: El numero de la sección <b>#{min}</b> es mayor que el de la sección siguiente: <b>#{max}</b>.</span><br/>"
-							return "ERROR: El numero de la sección #{min} es mayor que el de la sección siguiente: #{max}."
+							return "<span style='color: darkred;'>ERROR: El numero de la sección <b>#{min}</b> es mayor que el de la sección siguiente: <b>#{max}</b>.</span><br/>"
 						else if rev > max
 							@info.html "#{@info.html()}<span style='color: darkred;'>ERROR: La cantidad de secciones anteriores a <b>#{max}</b> le superan por #{rev - max}.</span><br/>"
-							return "ERROR: La cantidad de secciones anteriores a #{max} le superan por #{rev - max}."
+							return "<span style='color: darkred;'>ERROR: La cantidad de secciones anteriores a <b>#{max}</b> le superan por #{rev - max}.</span><br/>"
 						else if max > rev
 							@info.html "#{@info.html()}<span style='color: darkgoldenrod;'>ADVERTENCIA: La cantidad de secciones anteriores a <b>#{max}</b> son insuficientes, faltan #{max - rev}.</span><br/>"
 					else	
@@ -312,7 +315,7 @@ class Talos
 			for h2 in listH2
 				if h1 is h2 and index != index2
 					@info.html "#{@info.html()}<span style='color: darkred;'>ERROR: El nombre de la sección <b>#{h1}</b> se repite en otra sección.</span><br/>"
-					return "ERROR: El nombre de la sección #{h1} se repite en otra sección."
+					return "<span style='color: darkred;'>ERROR: El nombre de la sección <b>#{h1}</b> se repite en otra sección.</span><br/>"
 				index2++
 			index++
 
@@ -416,7 +419,7 @@ class Talos
 				toDOCX(html,@yaml)
 			else
 				@info.html "#{@info.html}<span style='color: darkred;'>ERROR: El formato de salida <b>*.#{@yaml.output}</b> no está soportado por Talos. Pruebe con: html, epub, docx y pdf.</span></br>"
-				return "ERROR: El formato de salida *.#{@yaml.output} no está soportado por Talos. Pruebe con: html, epub, docx y pdf."
+				return "<span style='color: darkred;'>ERROR: El formato de salida <b>*.#{@yaml.output}</b> no está soportado por Talos. Pruebe con: html, epub, docx y pdf.</span></br>"
 		else
 			saveTextFile(toHTML(html, @yaml), @yaml,'html')
 
