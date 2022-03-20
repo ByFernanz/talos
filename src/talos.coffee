@@ -190,7 +190,6 @@ class Talos
 		###
 		retornara un informe de errores y un archivo para descargar
 		###
-
 		# REINICIAR VARIABLES
 		@info.html ""
 		@info.html "#{@info.html()}<span><i>[0/8] Estableciendo configuración inicial...</i></span></br>"
@@ -203,12 +202,12 @@ class Talos
 		@info.html "#{@info.html()}<span><i>[1/8] Procesando cabecera del documento...</i></span></br>"
 		@yaml = jsyaml.load(@story.yml)
 		if @yaml.title?
-			@src += "<h1 style='font-size: 2.5em; text-align: center'>#{@yaml.title}</h1>\n\n"
+			@src += "<h1 style='font-size: 2.5em; text-align: center; line-height: 1.2em;'>#{@yaml.title}</h1>\n\n"
 		else
 			@yaml.title = "Sin Título"
 		
 		if @yaml.author?
-			@src += "<h1 style='font-style: italic; text-align: center;margin-bottom: 2em;'>#{@yaml.author}</h1>\n\n"
+			@src += "<h1 style='font-style: italic; text-align: center;margin-bottom: 2em;line-height: 1.2em;'>#{@yaml.author}</h1>\n\n"
 		else
 			@yaml.author = "Anónimo"
 
@@ -233,6 +232,7 @@ class Talos
 			@yaml.turn_to = " #{@yaml.turn_to} "
 		
 		# GUARDAR SECCIONES FIJAS Y SU INDICE
+		counterNormal = 0
 		@info.html "#{@info.html()}<span><i>[2/8] Recolectando secciones fijas...</i></span></br>"
 		fixedSections = []
 		currentSection = null
@@ -243,6 +243,8 @@ class Talos
 					blockIndex:	index
 					number:  parseInt el.name
 				fixedSections.push currentSection
+			if el.type is 'normal'
+				counterNormal++
 			index++
 
 		# REMOVIENDO DIVS
@@ -285,14 +287,16 @@ class Talos
 							return "<span style='color: darkred;'>ERROR: La cantidad de secciones anteriores a <b>#{max}</b> le superan por #{rev - max}.</span><br/>"
 						else if max > rev
 							@info.html "#{@info.html()}<span style='color: darkgoldenrod;'>ADVERTENCIA: La cantidad de secciones anteriores a <b>#{max}</b> son insuficientes, faltan #{max - rev}.</span><br/>"
-					else	
-						diff = @story.blocks.length - fixedSections[indexFix].number
-						max = @story.blocks.length
+					else
+						diff = counterNormal
+						max = counterNormal
+						min = 1 
 					count = min + 1
 					num = []
 					while count <= (min + diff)
 						num.push count
-						count++	
+						count++
+					console.log(num)	
 				indexFix++
 			else if el.type is 'normal'
 					listH.push el.name #guardar nombre
@@ -319,7 +323,6 @@ class Talos
 				index2++
 			index++
 
-			
 		# CAMBIAR POR NUMEROS LOS ENLACES
 		@info.html "#{@info.html()}<span><i>[4/8] Reasignando enlaces a las secciones numeradas...</i></span></br>"
 		index = 0
@@ -346,7 +349,11 @@ class Talos
 							number = searchElem(sec, mapSections)
 						else
 							number = content
-						line=line.replaceAll(sec, "#{@yaml.turn_to}[#{number}](##{number})")
+						
+						if number?
+							line=line.replaceAll(sec, "#{@yaml.turn_to}[#{number}](##{number})")
+						else
+							line=line.replaceAll(sec, "#{@yaml.turn_to}[sección no definida](#no-definida)")
 				@story.blocks[index].lines[indexL] = line
 				indexL++
 			index++
@@ -370,28 +377,39 @@ class Talos
 		elsNorm = []
 		for el in @story.blocks
 			if el.type is "ignored"
-				@src+="<h1 style='text-align: center;'>#{el.name}</h1>\n\n"
+				@src+="<h1 style='text-align: center;line-height: 1.2em;'>#{el.name}</h1>\n\n"
 				for line in el.lines
 					@src+="#{line}\n"
 			else if el.type is "fixed"
-				if elsNorm?
+				if elsNorm
 					elsNorm.sort((a,b) ->
 						if parseInt(a.name) > parseInt(b.name)
 							return 1
 						else
 							return -1)
 					for els in elsNorm
-						@src+="<h1 id='#{els.name}' name='#{els.name}' style='text-align: center;'>#{els.name}</h1>\n\n"
+						@src+="<h1 id='#{els.name}' name='#{els.name}' style='text-align: center;line-height: 1.2em;'>#{els.name}</h1>\n\n"
 						for line in els.lines
 							@src+="#{line}\n"
 				elsNorm = []
-				@src+="<h1 id='#{el.name}' name='#{el.name}' style='text-align: center;'>#{el.name}</h1>\n\n"
+				@src+="<h1 id='#{el.name}' name='#{el.name}' style='text-align: center;line-height: 1.2em;'>#{el.name}</h1>\n\n"
 				for line in el.lines
 					@src+="#{line}\n"
 			else if el.type is "normal"
 				elsNorm.push el
-				# como ordenar elementos renumerados
 			index++
+		if elsNorm
+			elsNorm.sort((a,b) ->
+				if parseInt(a.name) > parseInt(b.name)
+					return 1
+				else
+					return -1)
+			for els in elsNorm
+				@src+="<h1 id='#{els.name}' name='#{els.name}' style='text-align: center;line-height: 1.2em;'>#{els.name}</h1>\n\n"
+				for line in els.lines
+					@src+="#{line}\n"
+		elsNorm = []
+
 		
 
 		# CONVERTIR MARKDOWN A HTML

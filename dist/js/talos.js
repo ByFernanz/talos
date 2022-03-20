@@ -237,7 +237,7 @@ Talos = class Talos {
   @settings.output = [html,docx,epub, pdf]
    */
   compile(preview = "") {
-    var content, count, currentSection, diff, el, els, elsNorm, fix, fixedSections, h, h1, h2, html, i, index, index2, indexFix, indexL, j, k, l, len, len1, len10, len11, len12, len13, len14, len15, len16, len2, len3, len4, len5, len6, len7, len8, len9, line, linkedH, linkedS, listH, listH2, m, mapSections, matches, max, min, n, newlines, num, number, o, orphans, p, q, ref, ref1, ref2, ref3, ref4, ref5, ref6, ref7, ref8, ref9, rev, s, sec, t, u, v, w, x, y, z;
+    var content, count, counterNormal, currentSection, diff, el, els, elsNorm, fix, fixedSections, h, h1, h2, html, i, i1, index, index2, indexFix, indexL, j, j1, k, l, len, len1, len10, len11, len12, len13, len14, len15, len16, len17, len18, len2, len3, len4, len5, len6, len7, len8, len9, line, linkedH, linkedS, listH, listH2, m, mapSections, matches, max, min, n, newlines, num, number, o, orphans, p, q, ref, ref1, ref10, ref2, ref3, ref4, ref5, ref6, ref7, ref8, ref9, rev, s, sec, t, u, v, w, x, y, z;
     /*
     retornara un informe de errores y un archivo para descargar
     */
@@ -252,12 +252,12 @@ Talos = class Talos {
     this.info.html(`${this.info.html()}<span><i>[1/8] Procesando cabecera del documento...</i></span></br>`);
     this.yaml = jsyaml.load(this.story.yml);
     if (this.yaml.title != null) {
-      this.src += `<h1 style='font-size: 2.5em; text-align: center'>${this.yaml.title}</h1>\n\n`;
+      this.src += `<h1 style='font-size: 2.5em; text-align: center; line-height: 1.2em;'>${this.yaml.title}</h1>\n\n`;
     } else {
       this.yaml.title = "Sin Título";
     }
     if (this.yaml.author != null) {
-      this.src += `<h1 style='font-style: italic; text-align: center;margin-bottom: 2em;'>${this.yaml.author}</h1>\n\n`;
+      this.src += `<h1 style='font-style: italic; text-align: center;margin-bottom: 2em;line-height: 1.2em;'>${this.yaml.author}</h1>\n\n`;
     } else {
       this.yaml.author = "Anónimo";
     }
@@ -283,6 +283,7 @@ Talos = class Talos {
     }
     
     // GUARDAR SECCIONES FIJAS Y SU INDICE
+    counterNormal = 0;
     this.info.html(`${this.info.html()}<span><i>[2/8] Recolectando secciones fijas...</i></span></br>`);
     fixedSections = [];
     currentSection = null;
@@ -296,6 +297,9 @@ Talos = class Talos {
           number: parseInt(el.name)
         };
         fixedSections.push(currentSection);
+      }
+      if (el.type === 'normal') {
+        counterNormal++;
       }
       index++;
     }
@@ -350,8 +354,9 @@ Talos = class Talos {
               this.info.html(`${this.info.html()}<span style='color: darkgoldenrod;'>ADVERTENCIA: La cantidad de secciones anteriores a <b>${max}</b> son insuficientes, faltan ${max - rev}.</span><br/>`);
             }
           } else {
-            diff = this.story.blocks.length - fixedSections[indexFix].number;
-            max = this.story.blocks.length;
+            diff = counterNormal;
+            max = counterNormal;
+            min = 1;
           }
           count = min + 1;
           num = [];
@@ -359,6 +364,7 @@ Talos = class Talos {
             num.push(count);
             count++;
           }
+          console.log(num);
         }
         indexFix++;
       } else if (el.type === 'normal') {
@@ -393,7 +399,6 @@ Talos = class Talos {
       }
       index++;
     }
-    
     // CAMBIAR POR NUMEROS LOS ENLACES
     this.info.html(`${this.info.html()}<span><i>[4/8] Reasignando enlaces a las secciones numeradas...</i></span></br>`);
     index = 0;
@@ -429,7 +434,11 @@ Talos = class Talos {
             } else {
               number = content;
             }
-            line = line.replaceAll(sec, `${this.yaml.turn_to}[${number}](#${number})`);
+            if (number != null) {
+              line = line.replaceAll(sec, `${this.yaml.turn_to}[${number}](#${number})`);
+            } else {
+              line = line.replaceAll(sec, `${this.yaml.turn_to}[sección no definida](#no-definida)`);
+            }
           }
         }
         this.story.blocks[index].lines[indexL] = line;
@@ -462,14 +471,14 @@ Talos = class Talos {
     for (v = 0, len12 = ref6.length; v < len12; v++) {
       el = ref6[v];
       if (el.type === "ignored") {
-        this.src += `<h1 style='text-align: center;'>${el.name}</h1>\n\n`;
+        this.src += `<h1 style='text-align: center;line-height: 1.2em;'>${el.name}</h1>\n\n`;
         ref7 = el.lines;
         for (w = 0, len13 = ref7.length; w < len13; w++) {
           line = ref7[w];
           this.src += `${line}\n`;
         }
       } else if (el.type === "fixed") {
-        if (elsNorm != null) {
+        if (elsNorm) {
           elsNorm.sort(function(a, b) {
             if (parseInt(a.name) > parseInt(b.name)) {
               return 1;
@@ -479,7 +488,7 @@ Talos = class Talos {
           });
           for (x = 0, len14 = elsNorm.length; x < len14; x++) {
             els = elsNorm[x];
-            this.src += `<h1 id='${els.name}' name='${els.name}' style='text-align: center;'>${els.name}</h1>\n\n`;
+            this.src += `<h1 id='${els.name}' name='${els.name}' style='text-align: center;line-height: 1.2em;'>${els.name}</h1>\n\n`;
             ref8 = els.lines;
             for (y = 0, len15 = ref8.length; y < len15; y++) {
               line = ref8[y];
@@ -488,7 +497,7 @@ Talos = class Talos {
           }
         }
         elsNorm = [];
-        this.src += `<h1 id='${el.name}' name='${el.name}' style='text-align: center;'>${el.name}</h1>\n\n`;
+        this.src += `<h1 id='${el.name}' name='${el.name}' style='text-align: center;line-height: 1.2em;'>${el.name}</h1>\n\n`;
         ref9 = el.lines;
         for (z = 0, len16 = ref9.length; z < len16; z++) {
           line = ref9[z];
@@ -497,9 +506,27 @@ Talos = class Talos {
       } else if (el.type === "normal") {
         elsNorm.push(el);
       }
-      // como ordenar elementos renumerados
       index++;
     }
+    if (elsNorm) {
+      elsNorm.sort(function(a, b) {
+        if (parseInt(a.name) > parseInt(b.name)) {
+          return 1;
+        } else {
+          return -1;
+        }
+      });
+      for (i1 = 0, len17 = elsNorm.length; i1 < len17; i1++) {
+        els = elsNorm[i1];
+        this.src += `<h1 id='${els.name}' name='${els.name}' style='text-align: center;line-height: 1.2em;'>${els.name}</h1>\n\n`;
+        ref10 = els.lines;
+        for (j1 = 0, len18 = ref10.length; j1 < len18; j1++) {
+          line = ref10[j1];
+          this.src += `${line}\n`;
+        }
+      }
+    }
+    elsNorm = [];
     
     // CONVERTIR MARKDOWN A HTML
     this.info.html(`${this.info.html()}<span><i>[7/8] Renderizando documento...</i></span></br>`);

@@ -36,7 +36,7 @@ module.exports = (grunt) ->
           join: true
           bare: true
         files: [
-          'dist/talos.js': ['src/*.coffee']
+          'dist/js/talos.js': ['src/*.coffee']
         ]
 
     copy:
@@ -58,13 +58,13 @@ module.exports = (grunt) ->
     browserify:
       build:
         src: 'dist/talos.js',
-        dest: 'dist/talos.all.js'
+        dest: 'dist/js/talos.all.js'
 
     uglify:
       js:
         files:
-          'dist/talos.min.js': [
-            'dist/talos.js'
+          'dist/js/talos.min.js': [
+            'dist/js/talos.js'
           ]
 
     # grunt watch (or simply grunt)

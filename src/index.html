@@ -21,7 +21,7 @@
     <div id="talos-info"></div>
     <script>
         $.get('story.md', function(story){
-            talos = new Talos(parseText(story), {})
+            talos = new Talos(parseText(story), $('#talos-info'), {})
         }) 
     </script>
 </body>
