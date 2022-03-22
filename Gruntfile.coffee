@@ -54,6 +54,13 @@ module.exports = (grunt) ->
           src: ['src/*.html', 'src/*.png', 'src/*.md']
           dest: 'dist/'
         ]
+      talos_editor:
+        files: [
+          expand: true
+          flatten: true
+          src: ['dist/js/talos.js']
+          dest: '../talos-editor/public/js'
+        ]
     
     browserify:
       build:
@@ -71,13 +78,13 @@ module.exports = (grunt) ->
     watch:
       js:
         files: ['src/*.coffee']
-        tasks: ['build:js', 'copy:dist']
+        tasks: ['build:js', 'copy:dist', 'copy:talos_editor']
       css:
         files: ['src/scss/*.scss']
         tasks: ['sass:compile']
       static:
         files: ['src/*.html','src/*.js','src/*.md']
-        tasks: ['copy:static', 'copy:dist']
+        tasks: ['copy:static', 'copy:dist', 'copy:talos_editor']
       options:
         livereload: true
 

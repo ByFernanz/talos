@@ -1,4 +1,5 @@
 test = null
+test2 = null
 
 regexLib =
 	normal: /^[a-z][a-z_0-9]*\s{0,1}(.*)$/m,
@@ -50,14 +51,18 @@ extractBlocks = (lines) ->
 	blocks = []
 	currentBlock = null
 	for line in lines
-		match = line.match /^(#{1})\s+([^#].*)$/
+		#match = line.match /^(#{1})\s+([^#].*)$/
+		match = line.match /^(#{1})\s{1}([\p{Letter}\s\d\w]{0,}[\p{Letter}\d\w])/mu
 		if match?
 			if currentBlock != null
-				blocks.push currentBlock
+				blocks.push currentBlock 
 			currentBlock =
 				type: getBlockType match[2]
 				name: match[2]
 				lines: []
+			matchTitle = line.match /"([^"]*)"/mu
+			if matchTitle?
+				currentBlock.title = matchTitle[1]
 		else
 			if currentBlock != null
 				currentBlock.lines.push line
@@ -69,32 +74,30 @@ randomNum = (min, max) ->
     r = Math.random()*(max-min) + min
     return Math.floor(r)
 
-searchElem = (sec, mapSections) ->
-	for el in mapSections
-		name = "[#{el.name}]"
-		if name is sec
-			if el?
-				return el.number
-
 toPDF = (html, meta) ->
-	html += "<style>body{font-size:1.3em;}a{color:black;font-weight:bold;text-decoration:none;pointer-events:none;}</style>"
-	html = html.replace(/href=\"(.*?)\"/gm,"")
-	div = document.createElement('div')
-	div.id = 'content'
-	div.innerHTML = html
-	opt =
-		filename:     "#{meta.title}.pdf"
-		image:        { type: 'jpeg', quality: 0.98 }
-		html2canvas:  { scale: 2 }
-		margin: 0.7
-		enableLinks: true
-		pagebreak:
-			mode: 'avoid-all'
-		jsPDF:       
-			unit: 'in'
-			format: 'letter'
-			orientation: 'portrait'
-	html2pdf().set(opt).from(div).save()
+	html = html.replace(/style='(.*?)'/gm, "")
+	content = htmlToPdfmake(html, 
+		defaultStyles:
+			font: 'OpenSans'
+			a:
+				color: 'black'
+				decoration: ''
+				bold: true
+
+			h1:
+				alignment: 'center'
+			h2:
+				fontSize: 18
+				alignment: 'center'
+		)
+	dd = 
+		content: content
+			
+
+	pdfMake.createPdf(dd).download("#{meta.title}");
+	
+	
+
 
 toHTML = (html, meta) ->
 	html = """
@@ -171,7 +174,7 @@ class Talos
 		@info,
 		@settings
 	) ->
-		@converter = new markdownit({html: true})
+		@converter = new markdownit({html: true}).use(window.markdownitEmoji)
 		@yaml = null
 		@src = ""
 		@story = {}
@@ -201,6 +204,8 @@ class Talos
 		# PROCESAMIENTO DE YML
 		@info.html "#{@info.html()}<span><i>[1/8] Procesando cabecera del documento...</i></span></br>"
 		@yaml = jsyaml.load(@story.yml)
+		if not @yaml?
+			@yaml = {}
 		if @yaml.title?
 			@src += "<h1 style='font-size: 2.5em; text-align: center; line-height: 1.2em;'>#{@yaml.title}</h1>\n\n"
 		else
@@ -229,7 +234,7 @@ class Talos
 		if !@yaml.turn_to?
 			@yaml.turn_to = ''
 		else
-			@yaml.turn_to = " #{@yaml.turn_to} "
+			@yaml.turn_to = "#{@yaml.turn_to} "
 		
 		# GUARDAR SECCIONES FIJAS Y SU INDICE
 		counterNormal = 0
@@ -242,8 +247,11 @@ class Talos
 				currentSection =
 					blockIndex:	index
 					number:  parseInt el.name
+				if el.title
+					currentSection.title = el.title
 				fixedSections.push currentSection
 			if el.type is 'normal'
+				# Solo cuenta cuantas secciones normales hay
 				counterNormal++
 			index++
 
@@ -290,21 +298,23 @@ class Talos
 					else
 						diff = counterNormal
 						max = counterNormal
-						min = 1 
+						min = fixedSections[indexFix].number 
 					count = min + 1
 					num = []
 					while count <= (min + diff)
 						num.push count
 						count++
-					console.log(num)	
 				indexFix++
 			else if el.type is 'normal'
+					counterNormal = counterNormal - 1
 					listH.push el.name #guardar nombre
 					fix = randomNum(0, num.length)
 					currentSection =
 						name: el.name
 						number: num[fix]
 						index: index
+					if el.title
+						currentSection.title = el.title
 					@story.blocks[index].name = String(num[fix])
 					num.splice(fix, 1)
 					mapSections.push currentSection
@@ -343,17 +353,27 @@ class Talos
 							if h is content
 								linkedS = true
 						if !linkedS
-							@info.html "#{@info.html()}<span style='color: darkgoldenrod;'>ADVERTENCIA: La sección <b>#{content}</b>  a la que apunta <b>#{el.name}</b> no existe.</span><br/>"
-
+							@info.html "#{@info.html()}<span style='color: darkgoldenrod;'>ADVERTENCIA: La sección <b>#{content}</b>  a la que apunta <b>#{@storySrc.blocks[index].name}</b> no existe.</span><br/>"
 						if isNaN(content)
-							number = searchElem(sec, mapSections)
+							for normal in mapSections
+								if content is normal.name
+									elem = normal
 						else
-							number = content
-						
-						if number?
-							line=line.replaceAll(sec, "#{@yaml.turn_to}[#{number}](##{number})")
+							for fixed in fixedSections
+								if parseInt(content) is fixed.number
+									elem = fixed
+						if elem?
+							if @yaml.titled_sections and elem.title
+								if @yaml.output is 'html' or @yaml.output is 'epub'
+									line=line.replaceAll(sec, " #{@yaml.turn_to}[#{elem.title}](##{elem.number})")
+								else
+									line=line.replaceAll(sec, " **#{elem.title}** (#{@yaml.turn_to}[#{elem.number}](##{elem.number}))")
+							else
+								console.log(elem)
+								test = mapSections
+								line = line.replaceAll(sec, " #{@yaml.turn_to}[#{elem.number}](##{elem.number})")
 						else
-							line=line.replaceAll(sec, "#{@yaml.turn_to}[sección no definida](#no-definida)")
+							line=line.replaceAll(sec, " #{@yaml.turn_to}[sección no definida](#no-definida)")
 				@story.blocks[index].lines[indexL] = line
 				indexL++
 			index++
@@ -388,11 +408,25 @@ class Talos
 						else
 							return -1)
 					for els in elsNorm
-						@src+="<h1 id='#{els.name}' name='#{els.name}' style='text-align: center;line-height: 1.2em;'>#{els.name}</h1>\n\n"
+						if @yaml.titled_sections and els.title and not @yaml.hide_sections and (@yaml.output is 'html' or @yaml.output is 'epub')
+							@src+="<h1 id='#{els.name}' name='#{els.name}' style='text-align: center;line-height: 1.2em;'>#{els.title}</h1>\n\n"
+						else if @yaml.hide_sections and (@yaml.output is 'html' or @yaml.output is 'epub')
+							@src+="<hr id='#{els.name}' name='#{els.name}'/>\n\n"
+						else if not @yaml.hide_sections and @yaml.titled_sections and els.title and (@yaml.output is 'pdf' or @yaml.output is 'docx')
+							@src+="<h1 id='#{els.name}' name='#{els.name}' style='text-align: center;line-height: 1.2em;'>#{els.name}</h1>\n\n<h2>#{els.title}</h2>\n\n"
+						else
+							@src+="<h1 id='#{els.name}' name='#{els.name}' style='text-align: center;line-height: 1.2em;'>#{els.name}</h1>\n\n"
 						for line in els.lines
 							@src+="#{line}\n"
 				elsNorm = []
-				@src+="<h1 id='#{el.name}' name='#{el.name}' style='text-align: center;line-height: 1.2em;'>#{el.name}</h1>\n\n"
+				if @yaml.titled_sections and el.title and not @yaml.hide_sections and (@yaml.output is 'html' or @yaml.output is 'epub')
+					@src+="<h1 id='#{el.name}' name='#{el.name}' style='text-align: center;line-height: 1.2em;'>#{el.title}</h1>\n\n"
+				else if @yaml.hide_sections and (@yaml.output is 'html' or @yaml.output is 'epub')
+					@src+="<hr id='#{el.name}' name='#{el.name}'/>\n\n"
+				else if not @yaml.hide_sections and @yaml.titled_sections and el.title and (@yaml.output is 'pdf' or @yaml.output is 'docx')
+					@src+="<h1 id='#{el.name}' name='#{el.name}' style='text-align: center;line-height: 1.2em;'>#{el.name}</h1>\n\n<h2>#{el.title}</h2>\n\n"
+				else
+					@src+="<h1 id='#{el.name}' name='#{el.name}' style='text-align: center;line-height: 1.2em;'>#{el.name}</h1>\n\n"
 				for line in el.lines
 					@src+="#{line}\n"
 			else if el.type is "normal"
@@ -405,7 +439,14 @@ class Talos
 				else
 					return -1)
 			for els in elsNorm
-				@src+="<h1 id='#{els.name}' name='#{els.name}' style='text-align: center;line-height: 1.2em;'>#{els.name}</h1>\n\n"
+				if @yaml.titled_sections and els.title and not @yaml.hide_sections and (@yaml.output is 'html' or @yaml.output is 'epub')
+					@src+="<h1 id='#{els.name}' name='#{els.name}' style='text-align: center;line-height: 1.2em;'>#{els.title}</h1>\n\n"
+				else if @yaml.hide_sections and (@yaml.output is 'html' or @yaml.output is 'epub')
+					@src+="<hr id='#{els.name}' name='#{els.name}'/>\n\n"
+				else if not @yaml.hide_sections and @yaml.titled_sections and els.title and (@yaml.output is 'pdf' or @yaml.output is 'docx')
+					@src+="<h1 id='#{els.name}' name='#{els.name}' style='text-align: center;line-height: 1.2em;'>#{els.name}</h1>\n\n<h2>#{els.title}</h2>\n\n"
+				else
+					@src+="<h1 id='#{els.name}' name='#{els.name}' style='text-align: center;line-height: 1.2em;'>#{els.name}</h1>\n\n"
 				for line in els.lines
 					@src+="#{line}\n"
 		elsNorm = []

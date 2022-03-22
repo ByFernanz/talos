@@ -1,6 +1,8 @@
-var Talos, extractBlocks, extractYAML, getBlockType, parseText, randomNum, regexLib, saveTextFile, searchElem, test, toDOCX, toEPUB, toHTML, toPDF;
+var Talos, extractBlocks, extractYAML, getBlockType, parseText, randomNum, regexLib, saveTextFile, test, test2, toDOCX, toEPUB, toHTML, toPDF;
 
 test = null;
+
+test2 = null;
 
 regexLib = {
   normal: /^[a-z][a-z_0-9]*\s{0,1}(.*)$/m,
@@ -61,12 +63,13 @@ getBlockType = function(section) {
 };
 
 extractBlocks = function(lines) {
-  var blocks, currentBlock, i, len, line, match;
+  var blocks, currentBlock, i, len, line, match, matchTitle;
   blocks = [];
   currentBlock = null;
   for (i = 0, len = lines.length; i < len; i++) {
     line = lines[i];
-    match = line.match(/^(#{1})\s+([^#].*)$/);
+    //match = line.match /^(#{1})\s+([^#].*)$/
+    match = line.match(/^(#{1})\s{1}([\p{Letter}\s\d\w]{0,}[\p{Letter}\d\w])/mu);
     if (match != null) {
       if (currentBlock !== null) {
         blocks.push(currentBlock);
@@ -76,6 +79,10 @@ extractBlocks = function(lines) {
         name: match[2],
         lines: []
       };
+      matchTitle = line.match(/"([^"]*)"/mu);
+      if (matchTitle != null) {
+        currentBlock.title = matchTitle[1];
+      }
     } else {
       if (currentBlock !== null) {
         currentBlock.lines.push(line);
@@ -94,47 +101,30 @@ randomNum = function(min, max) {
   return Math.floor(r);
 };
 
-searchElem = function(sec, mapSections) {
-  var el, i, len, name;
-  for (i = 0, len = mapSections.length; i < len; i++) {
-    el = mapSections[i];
-    name = `[${el.name}]`;
-    if (name === sec) {
-      if (el != null) {
-        return el.number;
+toPDF = function(html, meta) {
+  var content, dd;
+  html = html.replace(/style='(.*?)'/gm, "");
+  content = htmlToPdfmake(html, {
+    defaultStyles: {
+      font: 'OpenSans',
+      a: {
+        color: 'black',
+        decoration: '',
+        bold: true
+      },
+      h1: {
+        alignment: 'center'
+      },
+      h2: {
+        fontSize: 18,
+        alignment: 'center'
       }
     }
-  }
-};
-
-toPDF = function(html, meta) {
-  var div, opt;
-  html += "<style>body{font-size:1.3em;}a{color:black;font-weight:bold;text-decoration:none;pointer-events:none;}</style>";
-  html = html.replace(/href=\"(.*?)\"/gm, "");
-  div = document.createElement('div');
-  div.id = 'content';
-  div.innerHTML = html;
-  opt = {
-    filename: `${meta.title}.pdf`,
-    image: {
-      type: 'jpeg',
-      quality: 0.98
-    },
-    html2canvas: {
-      scale: 2
-    },
-    margin: 0.7,
-    enableLinks: true,
-    pagebreak: {
-      mode: 'avoid-all'
-    },
-    jsPDF: {
-      unit: 'in',
-      format: 'letter',
-      orientation: 'portrait'
-    }
+  });
+  dd = {
+    content: content
   };
-  return html2pdf().set(opt).from(div).save();
+  return pdfMake.createPdf(dd).download(`${meta.title}`);
 };
 
 toHTML = function(html, meta) {
@@ -222,7 +212,7 @@ Talos = class Talos {
     this.settings = settings;
     this.converter = new markdownit({
       html: true
-    });
+    }).use(window.markdownitEmoji);
     this.yaml = null;
     this.src = "";
     this.story = {};
@@ -237,7 +227,7 @@ Talos = class Talos {
   @settings.output = [html,docx,epub, pdf]
    */
   compile(preview = "") {
-    var content, count, counterNormal, currentSection, diff, el, els, elsNorm, fix, fixedSections, h, h1, h2, html, i, i1, index, index2, indexFix, indexL, j, j1, k, l, len, len1, len10, len11, len12, len13, len14, len15, len16, len17, len18, len2, len3, len4, len5, len6, len7, len8, len9, line, linkedH, linkedS, listH, listH2, m, mapSections, matches, max, min, n, newlines, num, number, o, orphans, p, q, ref, ref1, ref10, ref2, ref3, ref4, ref5, ref6, ref7, ref8, ref9, rev, s, sec, t, u, v, w, x, y, z;
+    var content, count, counterNormal, currentSection, diff, el, elem, els, elsNorm, fix, fixed, fixedSections, h, h1, h2, html, i, i1, index, index2, indexFix, indexL, j, j1, k, k1, l, l1, len, len1, len10, len11, len12, len13, len14, len15, len16, len17, len18, len19, len2, len20, len3, len4, len5, len6, len7, len8, len9, line, linkedH, linkedS, listH, listH2, m, mapSections, matches, max, min, n, newlines, normal, num, o, orphans, p, q, ref, ref1, ref10, ref2, ref3, ref4, ref5, ref6, ref7, ref8, ref9, rev, s, sec, t, u, v, w, x, y, z;
     /*
     retornara un informe de errores y un archivo para descargar
     */
@@ -251,6 +241,9 @@ Talos = class Talos {
     // PROCESAMIENTO DE YML
     this.info.html(`${this.info.html()}<span><i>[1/8] Procesando cabecera del documento...</i></span></br>`);
     this.yaml = jsyaml.load(this.story.yml);
+    if (this.yaml == null) {
+      this.yaml = {};
+    }
     if (this.yaml.title != null) {
       this.src += `<h1 style='font-size: 2.5em; text-align: center; line-height: 1.2em;'>${this.yaml.title}</h1>\n\n`;
     } else {
@@ -279,7 +272,7 @@ Talos = class Talos {
     if (this.yaml.turn_to == null) {
       this.yaml.turn_to = '';
     } else {
-      this.yaml.turn_to = ` ${this.yaml.turn_to} `;
+      this.yaml.turn_to = `${this.yaml.turn_to} `;
     }
     
     // GUARDAR SECCIONES FIJAS Y SU INDICE
@@ -296,9 +289,13 @@ Talos = class Talos {
           blockIndex: index,
           number: parseInt(el.name)
         };
+        if (el.title) {
+          currentSection.title = el.title;
+        }
         fixedSections.push(currentSection);
       }
       if (el.type === 'normal') {
+        // Solo cuenta cuantas secciones normales hay
         counterNormal++;
       }
       index++;
@@ -356,7 +353,7 @@ Talos = class Talos {
           } else {
             diff = counterNormal;
             max = counterNormal;
-            min = 1;
+            min = fixedSections[indexFix].number;
           }
           count = min + 1;
           num = [];
@@ -364,10 +361,10 @@ Talos = class Talos {
             num.push(count);
             count++;
           }
-          console.log(num);
         }
         indexFix++;
       } else if (el.type === 'normal') {
+        counterNormal = counterNormal - 1;
         listH.push(el.name); //guardar nombre
         fix = randomNum(0, num.length);
         currentSection = {
@@ -375,6 +372,9 @@ Talos = class Talos {
           number: num[fix],
           index: index
         };
+        if (el.title) {
+          currentSection.title = el.title;
+        }
         this.story.blocks[index].name = String(num[fix]);
         num.splice(fix, 1);
         mapSections.push(currentSection);
@@ -427,17 +427,37 @@ Talos = class Talos {
               }
             }
             if (!linkedS) {
-              this.info.html(`${this.info.html()}<span style='color: darkgoldenrod;'>ADVERTENCIA: La sección <b>${content}</b>  a la que apunta <b>${el.name}</b> no existe.</span><br/>`);
+              this.info.html(`${this.info.html()}<span style='color: darkgoldenrod;'>ADVERTENCIA: La sección <b>${content}</b>  a la que apunta <b>${this.storySrc.blocks[index].name}</b> no existe.</span><br/>`);
             }
             if (isNaN(content)) {
-              number = searchElem(sec, mapSections);
+              for (t = 0, len10 = mapSections.length; t < len10; t++) {
+                normal = mapSections[t];
+                if (content === normal.name) {
+                  elem = normal;
+                }
+              }
             } else {
-              number = content;
+              for (u = 0, len11 = fixedSections.length; u < len11; u++) {
+                fixed = fixedSections[u];
+                if (parseInt(content) === fixed.number) {
+                  elem = fixed;
+                }
+              }
             }
-            if (number != null) {
-              line = line.replaceAll(sec, `${this.yaml.turn_to}[${number}](#${number})`);
+            if (elem != null) {
+              if (this.yaml.titled_sections && elem.title) {
+                if (this.yaml.output === 'html' || this.yaml.output === 'epub') {
+                  line = line.replaceAll(sec, ` ${this.yaml.turn_to}[${elem.title}](#${elem.number})`);
+                } else {
+                  line = line.replaceAll(sec, ` **${elem.title}** (${this.yaml.turn_to}[${elem.number}](#${elem.number}))`);
+                }
+              } else {
+                console.log(elem);
+                test = mapSections;
+                line = line.replaceAll(sec, ` ${this.yaml.turn_to}[${elem.number}](#${elem.number})`);
+              }
             } else {
-              line = line.replaceAll(sec, `${this.yaml.turn_to}[sección no definida](#no-definida)`);
+              line = line.replaceAll(sec, ` ${this.yaml.turn_to}[sección no definida](#no-definida)`);
             }
           }
         }
@@ -449,15 +469,15 @@ Talos = class Talos {
     // REVISAR SI ALGUNA SECCION SE ENCUENTRA NO ENLAZADA
     this.info.html(`${this.info.html()}<span><i>[5/8] Examinando si hay secciones huérfanas...</i></span></br>`);
     orphans = [];
-    for (t = 0, len10 = listH.length; t < len10; t++) {
-      sec = listH[t];
+    for (v = 0, len12 = listH.length; v < len12; v++) {
+      sec = listH[v];
       if (!linkedH[sec]) {
         orphans.push(sec);
       }
     }
     if (orphans) {
-      for (u = 0, len11 = orphans.length; u < len11; u++) {
-        sec = orphans[u];
+      for (w = 0, len13 = orphans.length; w < len13; w++) {
+        sec = orphans[w];
         if (sec !== '1') {
           this.info.html(`${this.info.html()}<span style='color: darkgoldenrod;'>ADVERTENCIA: Ningún enlace apunta a la sección <b>${sec}</b>.</span><br/>`);
         }
@@ -468,13 +488,13 @@ Talos = class Talos {
     index = 0;
     elsNorm = [];
     ref6 = this.story.blocks;
-    for (v = 0, len12 = ref6.length; v < len12; v++) {
-      el = ref6[v];
+    for (x = 0, len14 = ref6.length; x < len14; x++) {
+      el = ref6[x];
       if (el.type === "ignored") {
         this.src += `<h1 style='text-align: center;line-height: 1.2em;'>${el.name}</h1>\n\n`;
         ref7 = el.lines;
-        for (w = 0, len13 = ref7.length; w < len13; w++) {
-          line = ref7[w];
+        for (y = 0, len15 = ref7.length; y < len15; y++) {
+          line = ref7[y];
           this.src += `${line}\n`;
         }
       } else if (el.type === "fixed") {
@@ -486,21 +506,37 @@ Talos = class Talos {
               return -1;
             }
           });
-          for (x = 0, len14 = elsNorm.length; x < len14; x++) {
-            els = elsNorm[x];
-            this.src += `<h1 id='${els.name}' name='${els.name}' style='text-align: center;line-height: 1.2em;'>${els.name}</h1>\n\n`;
+          for (z = 0, len16 = elsNorm.length; z < len16; z++) {
+            els = elsNorm[z];
+            if (this.yaml.titled_sections && els.title && !this.yaml.hide_sections && (this.yaml.output === 'html' || this.yaml.output === 'epub')) {
+              this.src += `<h1 id='${els.name}' name='${els.name}' style='text-align: center;line-height: 1.2em;'>${els.title}</h1>\n\n`;
+            } else if (this.yaml.hide_sections && (this.yaml.output === 'html' || this.yaml.output === 'epub')) {
+              this.src += `<hr id='${els.name}' name='${els.name}'/>\n\n`;
+            } else if (!this.yaml.hide_sections && this.yaml.titled_sections && els.title && (this.yaml.output === 'pdf' || this.yaml.output === 'docx')) {
+              this.src += `<h1 id='${els.name}' name='${els.name}' style='text-align: center;line-height: 1.2em;'>${els.name}</h1>\n\n<h2>${els.title}</h2>\n\n`;
+            } else {
+              this.src += `<h1 id='${els.name}' name='${els.name}' style='text-align: center;line-height: 1.2em;'>${els.name}</h1>\n\n`;
+            }
             ref8 = els.lines;
-            for (y = 0, len15 = ref8.length; y < len15; y++) {
-              line = ref8[y];
+            for (i1 = 0, len17 = ref8.length; i1 < len17; i1++) {
+              line = ref8[i1];
               this.src += `${line}\n`;
             }
           }
         }
         elsNorm = [];
-        this.src += `<h1 id='${el.name}' name='${el.name}' style='text-align: center;line-height: 1.2em;'>${el.name}</h1>\n\n`;
+        if (this.yaml.titled_sections && el.title && !this.yaml.hide_sections && (this.yaml.output === 'html' || this.yaml.output === 'epub')) {
+          this.src += `<h1 id='${el.name}' name='${el.name}' style='text-align: center;line-height: 1.2em;'>${el.title}</h1>\n\n`;
+        } else if (this.yaml.hide_sections && (this.yaml.output === 'html' || this.yaml.output === 'epub')) {
+          this.src += `<hr id='${el.name}' name='${el.name}'/>\n\n`;
+        } else if (!this.yaml.hide_sections && this.yaml.titled_sections && el.title && (this.yaml.output === 'pdf' || this.yaml.output === 'docx')) {
+          this.src += `<h1 id='${el.name}' name='${el.name}' style='text-align: center;line-height: 1.2em;'>${el.name}</h1>\n\n<h2>${el.title}</h2>\n\n`;
+        } else {
+          this.src += `<h1 id='${el.name}' name='${el.name}' style='text-align: center;line-height: 1.2em;'>${el.name}</h1>\n\n`;
+        }
         ref9 = el.lines;
-        for (z = 0, len16 = ref9.length; z < len16; z++) {
-          line = ref9[z];
+        for (j1 = 0, len18 = ref9.length; j1 < len18; j1++) {
+          line = ref9[j1];
           this.src += `${line}\n`;
         }
       } else if (el.type === "normal") {
@@ -516,12 +552,20 @@ Talos = class Talos {
           return -1;
         }
       });
-      for (i1 = 0, len17 = elsNorm.length; i1 < len17; i1++) {
-        els = elsNorm[i1];
-        this.src += `<h1 id='${els.name}' name='${els.name}' style='text-align: center;line-height: 1.2em;'>${els.name}</h1>\n\n`;
+      for (k1 = 0, len19 = elsNorm.length; k1 < len19; k1++) {
+        els = elsNorm[k1];
+        if (this.yaml.titled_sections && els.title && !this.yaml.hide_sections && (this.yaml.output === 'html' || this.yaml.output === 'epub')) {
+          this.src += `<h1 id='${els.name}' name='${els.name}' style='text-align: center;line-height: 1.2em;'>${els.title}</h1>\n\n`;
+        } else if (this.yaml.hide_sections && (this.yaml.output === 'html' || this.yaml.output === 'epub')) {
+          this.src += `<hr id='${els.name}' name='${els.name}'/>\n\n`;
+        } else if (!this.yaml.hide_sections && this.yaml.titled_sections && els.title && (this.yaml.output === 'pdf' || this.yaml.output === 'docx')) {
+          this.src += `<h1 id='${els.name}' name='${els.name}' style='text-align: center;line-height: 1.2em;'>${els.name}</h1>\n\n<h2>${els.title}</h2>\n\n`;
+        } else {
+          this.src += `<h1 id='${els.name}' name='${els.name}' style='text-align: center;line-height: 1.2em;'>${els.name}</h1>\n\n`;
+        }
         ref10 = els.lines;
-        for (j1 = 0, len18 = ref10.length; j1 < len18; j1++) {
-          line = ref10[j1];
+        for (l1 = 0, len20 = ref10.length; l1 < len20; l1++) {
+          line = ref10[l1];
           this.src += `${line}\n`;
         }
       }
