@@ -180,8 +180,20 @@ toEPUB = async function(html, meta) {
 
 toDOCX = function(html, meta) {
   var doc;
+  html = `<!DOCTYPE html>
+	<html lang="${meta.lang}">
+	<head>
+		<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+   				<title>${meta.title}</title>
+	</head>
+	<body>
+		${html}
+	</body>
+</html>`;
   doc = htmlDocx.asBlob(html);
-  return saveAs(doc, `${meta.title}.docx`);
+  htmlDocx.asBlob(html);
+  //saveAs(doc,"#{meta.title}.docx")
+  return saveTextFile(doc, meta, "docx");
 };
 
 saveTextFile = function(doc, meta, ext) {
@@ -452,7 +464,6 @@ Talos = class Talos {
                   line = line.replaceAll(sec, ` **${elem.title}** (${this.yaml.turn_to}[${elem.number}](#${elem.number}))`);
                 }
               } else {
-                console.log(elem);
                 test = mapSections;
                 line = line.replaceAll(sec, ` ${this.yaml.turn_to}[${elem.number}](#${elem.number})`);
               }
