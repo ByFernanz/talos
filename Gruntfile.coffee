@@ -59,7 +59,7 @@ module.exports = (grunt) ->
           expand: true
           flatten: true
           src: ['dist/js/talos.js']
-          dest: '../talos-editor/public/js'
+          dest: '../talos-editor/docs/js'
         ]
     
     browserify:

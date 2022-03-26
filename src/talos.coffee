@@ -1,5 +1,5 @@
 test = null
-test2 = null
+graph_book = ""
 
 regexLib =
 	normal: /^[a-z][a-z_0-9]*\s{0,1}(.*)$/m,
@@ -10,8 +10,9 @@ regexLib =
 
 parseText = (text) ->
 	lines = text.split /\n|\r\n/
-	yml = extractYAML lines
-	blocks = extractBlocks lines
+	procYML = extractYAML lines
+	yml = procYML.ymlBlock
+	blocks = extractBlocks procYML.cleanLines
 	#story = parseBlocks blocks
 	return {yml, blocks}
 
@@ -20,6 +21,7 @@ extractYAML = (lines) ->
 	ymlLines = []
 	ymlBlock = ""
 	firstLine = true
+	cleanLines = []
 	ymlHead = false # para confirmar si existe un bloque YML
 	for line in lines
 		if firstLine and not ymlHead
@@ -34,9 +36,11 @@ extractYAML = (lines) ->
 				ymlHead = false
 			else
 				ymlLines.push line
+		else
+			cleanLines.push line
 	for el in ymlLines
 		ymlBlock += el + "\n"
-	return ymlBlock
+	return {ymlBlock, cleanLines}
 
 
 getBlockType = (section) ->
@@ -96,7 +100,7 @@ toPDF = (html, meta) ->
 
 	pdfMake.createPdf(dd).download("#{meta.title}");
 	
-	
+
 
 
 toHTML = (html, meta) ->
@@ -208,6 +212,7 @@ class Talos
 		retornara un informe de errores y un archivo para descargar
 		###
 		# REINICIAR VARIABLES
+		graph_book = ""
 		@info.html ""
 		@info.html "#{@info.html()}<span><i>[0/8] Estableciendo configuración inicial...</i></span></br>"
 		@story = JSON.parse(JSON.stringify(@storySrc))
@@ -250,6 +255,15 @@ class Talos
 		else
 			@yaml.turn_to = "#{@yaml.turn_to} "
 		
+		# EXTRAER METADATOS DE LAS SECCIONES
+		index = 0
+		for el in @story.blocks
+			if el.type is 'fixed' or el.type is 'normal'
+				procYML = extractYAML(@story.blocks[index].lines)
+				@story.blocks[index].yaml = jsyaml.load(procYML.ymlBlock)
+				@story.blocks[index].lines = procYML.cleanLines
+			index++
+
 		# GUARDAR SECCIONES FIJAS Y SU INDICE
 		counterNormal = 0
 		@info.html "#{@info.html()}<span><i>[2/8] Recolectando secciones fijas...</i></span></br>"
@@ -262,7 +276,12 @@ class Talos
 					blockIndex:	index
 					number:  parseInt el.name
 				if el.title
-					currentSection.title = el.title
+						currentSection.title = el.title
+						@story.blocks[index].yaml.title = el.title
+					else if el.yaml
+						if el.yaml.title
+							currentSection.title = el.yaml.title
+							@story.blocks[index].title = el.yaml.title
 				fixedSections.push currentSection
 			if el.type is 'normal'
 				# Solo cuenta cuantas secciones normales hay
@@ -329,6 +348,11 @@ class Talos
 						index: index
 					if el.title
 						currentSection.title = el.title
+						@story.blocks[index].yaml.title = el.title
+					else if el.yaml
+						if el.yaml.title
+							currentSection.title = el.yaml.title
+							@story.blocks[index].title = el.yaml.title
 					@story.blocks[index].name = String(num[fix])
 					num.splice(fix, 1)
 					mapSections.push currentSection
@@ -383,7 +407,6 @@ class Talos
 								else
 									line=line.replaceAll(sec, " **#{elem.title}** (#{@yaml.turn_to}[#{elem.number}](##{elem.number}))")
 							else
-								test = mapSections
 								line = line.replaceAll(sec, " #{@yaml.turn_to}[#{elem.number}](##{elem.number})")
 						else
 							line=line.replaceAll(sec, " #{@yaml.turn_to}[sección no definida](#no-definida)")
@@ -423,25 +446,36 @@ class Talos
 					for els in elsNorm
 						if @yaml.titled_sections and els.title and not @yaml.hide_sections and (@yaml.output is 'html' or @yaml.output is 'epub')
 							@src+="<h1 id='#{els.name}' name='#{els.name}' style='text-align: center;line-height: 1.2em;'>#{els.title}</h1>\n\n"
+							graph_book += "# #{els.name}\n"
 						else if @yaml.hide_sections and (@yaml.output is 'html' or @yaml.output is 'epub')
 							@src+="<hr id='#{els.name}' name='#{els.name}'/>\n\n"
+							graph_book += "# #{els.name}\n"
 						else if not @yaml.hide_sections and @yaml.titled_sections and els.title and (@yaml.output is 'pdf' or @yaml.output is 'docx')
 							@src+="<h1 id='#{els.name}' name='#{els.name}' style='text-align: center;line-height: 1.2em;'>#{els.name}</h1>\n\n<h2>#{els.title}</h2>\n\n"
+							graph_book += "# #{els.name}\n"
 						else
 							@src+="<h1 id='#{els.name}' name='#{els.name}' style='text-align: center;line-height: 1.2em;'>#{els.name}</h1>\n\n"
+							graph_book += "# #{els.name}\n"
 						for line in els.lines
 							@src+="#{line}\n"
+							graph_book +="#{line}\n"
+
 				elsNorm = []
 				if @yaml.titled_sections and el.title and not @yaml.hide_sections and (@yaml.output is 'html' or @yaml.output is 'epub')
 					@src+="<h1 id='#{el.name}' name='#{el.name}' style='text-align: center;line-height: 1.2em;'>#{el.title}</h1>\n\n"
+					graph_book += "# #{el.name}\n"
 				else if @yaml.hide_sections and (@yaml.output is 'html' or @yaml.output is 'epub')
 					@src+="<hr id='#{el.name}' name='#{el.name}'/>\n\n"
+					graph_book += "# #{el.name}\n"
 				else if not @yaml.hide_sections and @yaml.titled_sections and el.title and (@yaml.output is 'pdf' or @yaml.output is 'docx')
 					@src+="<h1 id='#{el.name}' name='#{el.name}' style='text-align: center;line-height: 1.2em;'>#{el.name}</h1>\n\n<h2>#{el.title}</h2>\n\n"
+					graph_book += "# #{el.name}\n"
 				else
 					@src+="<h1 id='#{el.name}' name='#{el.name}' style='text-align: center;line-height: 1.2em;'>#{el.name}</h1>\n\n"
+					graph_book += "# #{el.name}\n"
 				for line in el.lines
 					@src+="#{line}\n"
+					graph_book +="#{line}\n"
 			else if el.type is "normal"
 				elsNorm.push el
 			index++
@@ -454,14 +488,19 @@ class Talos
 			for els in elsNorm
 				if @yaml.titled_sections and els.title and not @yaml.hide_sections and (@yaml.output is 'html' or @yaml.output is 'epub')
 					@src+="<h1 id='#{els.name}' name='#{els.name}' style='text-align: center;line-height: 1.2em;'>#{els.title}</h1>\n\n"
+					graph_book += "# #{els.name}\n"
 				else if @yaml.hide_sections and (@yaml.output is 'html' or @yaml.output is 'epub')
 					@src+="<hr id='#{els.name}' name='#{els.name}'/>\n\n"
+					graph_book += "# #{els.name}\n"
 				else if not @yaml.hide_sections and @yaml.titled_sections and els.title and (@yaml.output is 'pdf' or @yaml.output is 'docx')
 					@src+="<h1 id='#{els.name}' name='#{els.name}' style='text-align: center;line-height: 1.2em;'>#{els.name}</h1>\n\n<h2>#{els.title}</h2>\n\n"
+					graph_book += "# #{els.name}\n"
 				else
 					@src+="<h1 id='#{els.name}' name='#{els.name}' style='text-align: center;line-height: 1.2em;'>#{els.name}</h1>\n\n"
+					graph_book += "# #{els.name}\n"
 				for line in els.lines
 					@src+="#{line}\n"
+					graph_book +="#{line}\n"
 		elsNorm = []
 
 		

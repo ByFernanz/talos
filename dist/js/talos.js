@@ -1,8 +1,8 @@
-var Talos, extractBlocks, extractYAML, getBlockType, parseText, randomNum, regexLib, saveTextFile, test, test2, toDOCX, toEPUB, toHTML, toPDF;
+var Talos, extractBlocks, extractYAML, getBlockType, graph_book, parseText, randomNum, regexLib, saveTextFile, test, toDOCX, toEPUB, toHTML, toPDF;
 
 test = null;
 
-test2 = null;
+graph_book = "";
 
 regexLib = {
   normal: /^[a-z][a-z_0-9]*\s{0,1}(.*)$/m,
@@ -13,19 +13,21 @@ regexLib = {
 };
 
 parseText = function(text) {
-  var blocks, lines, yml;
+  var blocks, lines, procYML, yml;
   lines = text.split(/\n|\r\n/);
-  yml = extractYAML(lines);
-  blocks = extractBlocks(lines);
+  procYML = extractYAML(lines);
+  yml = procYML.ymlBlock;
+  blocks = extractBlocks(procYML.cleanLines);
   //story = parseBlocks blocks
   return {yml, blocks};
 };
 
 extractYAML = function(lines) {
-  var el, firstLine, i, j, len, len1, line, ymlBlock, ymlHead, ymlLines;
+  var cleanLines, el, firstLine, i, j, len, len1, line, ymlBlock, ymlHead, ymlLines;
   ymlLines = [];
   ymlBlock = "";
   firstLine = true;
+  cleanLines = [];
   ymlHead = false; // para confirmar si existe un bloque YML
   for (i = 0, len = lines.length; i < len; i++) {
     line = lines[i];
@@ -43,13 +45,15 @@ extractYAML = function(lines) {
       } else {
         ymlLines.push(line);
       }
+    } else {
+      cleanLines.push(line);
     }
   }
   for (j = 0, len1 = ymlLines.length; j < len1; j++) {
     el = ymlLines[j];
     ymlBlock += el + "\n";
   }
-  return ymlBlock;
+  return {ymlBlock, cleanLines};
 };
 
 getBlockType = function(section) {
@@ -239,11 +243,12 @@ Talos = class Talos {
   @settings.output = [html,docx,epub, pdf]
    */
   compile(preview = "") {
-    var content, count, counterNormal, currentSection, diff, el, elem, els, elsNorm, fix, fixed, fixedSections, h, h1, h2, html, i, i1, index, index2, indexFix, indexL, j, j1, k, k1, l, l1, len, len1, len10, len11, len12, len13, len14, len15, len16, len17, len18, len19, len2, len20, len3, len4, len5, len6, len7, len8, len9, line, linkedH, linkedS, listH, listH2, m, mapSections, matches, max, min, n, newlines, normal, num, o, orphans, p, q, ref, ref1, ref10, ref2, ref3, ref4, ref5, ref6, ref7, ref8, ref9, rev, s, sec, t, u, v, w, x, y, z;
+    var content, count, counterNormal, currentSection, diff, el, elem, els, elsNorm, fix, fixed, fixedSections, h, h1, h2, html, i, i1, index, index2, indexFix, indexL, j, j1, k, k1, l, l1, len, len1, len10, len11, len12, len13, len14, len15, len16, len17, len18, len19, len2, len20, len21, len3, len4, len5, len6, len7, len8, len9, line, linkedH, linkedS, listH, listH2, m, m1, mapSections, matches, max, min, n, newlines, normal, num, o, orphans, p, procYML, q, ref, ref1, ref10, ref11, ref2, ref3, ref4, ref5, ref6, ref7, ref8, ref9, rev, s, sec, t, u, v, w, x, y, z;
     /*
     retornara un informe de errores y un archivo para descargar
     */
     // REINICIAR VARIABLES
+    graph_book = "";
     this.info.html("");
     this.info.html(`${this.info.html()}<span><i>[0/8] Estableciendo configuración inicial...</i></span></br>`);
     this.story = JSON.parse(JSON.stringify(this.storySrc));
@@ -287,15 +292,27 @@ Talos = class Talos {
       this.yaml.turn_to = `${this.yaml.turn_to} `;
     }
     
+    // EXTRAER METADATOS DE LAS SECCIONES
+    index = 0;
+    ref = this.story.blocks;
+    for (i = 0, len = ref.length; i < len; i++) {
+      el = ref[i];
+      if (el.type === 'fixed' || el.type === 'normal') {
+        procYML = extractYAML(this.story.blocks[index].lines);
+        this.story.blocks[index].yaml = jsyaml.load(procYML.ymlBlock);
+        this.story.blocks[index].lines = procYML.cleanLines;
+      }
+      index++;
+    }
     // GUARDAR SECCIONES FIJAS Y SU INDICE
     counterNormal = 0;
     this.info.html(`${this.info.html()}<span><i>[2/8] Recolectando secciones fijas...</i></span></br>`);
     fixedSections = [];
     currentSection = null;
     index = 0;
-    ref = this.story.blocks;
-    for (i = 0, len = ref.length; i < len; i++) {
-      el = ref[i];
+    ref1 = this.story.blocks;
+    for (j = 0, len1 = ref1.length; j < len1; j++) {
+      el = ref1[j];
       if (el.type === 'fixed') {
         currentSection = {
           blockIndex: index,
@@ -303,6 +320,12 @@ Talos = class Talos {
         };
         if (el.title) {
           currentSection.title = el.title;
+          this.story.blocks[index].yaml.title = el.title;
+        } else if (el.yaml) {
+          if (el.yaml.title) {
+            currentSection.title = el.yaml.title;
+            this.story.blocks[index].title = el.yaml.title;
+          }
         }
         fixedSections.push(currentSection);
       }
@@ -314,13 +337,13 @@ Talos = class Talos {
     }
     // REMOVIENDO DIVS
     index = 0;
-    ref1 = this.story.blocks;
-    for (j = 0, len1 = ref1.length; j < len1; j++) {
-      el = ref1[j];
+    ref2 = this.story.blocks;
+    for (k = 0, len2 = ref2.length; k < len2; k++) {
+      el = ref2[k];
       indexL = 0;
-      ref2 = el.lines;
-      for (k = 0, len2 = ref2.length; k < len2; k++) {
-        line = ref2[k];
+      ref3 = el.lines;
+      for (l = 0, len3 = ref3.length; l < len3; l++) {
+        line = ref3[l];
         if (line.match(regexLib.div) != null) {
           this.story.blocks[index].lines[indexL] = "";
         }
@@ -341,9 +364,9 @@ Talos = class Talos {
     max = 0;
     num = [];
     rev = 0;
-    ref3 = this.story.blocks;
-    for (l = 0, len3 = ref3.length; l < len3; l++) {
-      el = ref3[l];
+    ref4 = this.story.blocks;
+    for (m = 0, len4 = ref4.length; m < len4; m++) {
+      el = ref4[m];
       if (el.type === 'fixed') {
         listH.push(el.name); //guardar nombre
         if (fixedSections[indexFix].number === parseInt(el.name)) {
@@ -386,6 +409,12 @@ Talos = class Talos {
         };
         if (el.title) {
           currentSection.title = el.title;
+          this.story.blocks[index].yaml.title = el.title;
+        } else if (el.yaml) {
+          if (el.yaml.title) {
+            currentSection.title = el.yaml.title;
+            this.story.blocks[index].title = el.yaml.title;
+          }
         }
         this.story.blocks[index].name = String(num[fix]);
         num.splice(fix, 1);
@@ -398,11 +427,11 @@ Talos = class Talos {
     index = 0;
     index2 = 0;
     listH2 = listH;
-    for (m = 0, len4 = listH.length; m < len4; m++) {
-      h1 = listH[m];
+    for (n = 0, len5 = listH.length; n < len5; n++) {
+      h1 = listH[n];
       index2 = 0;
-      for (n = 0, len5 = listH2.length; n < len5; n++) {
-        h2 = listH2[n];
+      for (o = 0, len6 = listH2.length; o < len6; o++) {
+        h2 = listH2[o];
         if (h1 === h2 && index !== index2) {
           this.info.html(`${this.info.html()}<span style='color: darkred;'>ERROR: El nombre de la sección <b>${h1}</b> se repite en otra sección.</span><br/>`);
           return `<span style='color: darkred;'>ERROR: El nombre de la sección <b>${h1}</b> se repite en otra sección.</span><br/>`;
@@ -416,24 +445,24 @@ Talos = class Talos {
     index = 0;
     // Para guardar las secciones enlazadas
     linkedH = {};
-    ref4 = this.story.blocks;
-    for (o = 0, len6 = ref4.length; o < len6; o++) {
-      el = ref4[o];
+    ref5 = this.story.blocks;
+    for (p = 0, len7 = ref5.length; p < len7; p++) {
+      el = ref5[p];
       indexL = 0;
       newlines = [];
-      ref5 = el.lines;
-      for (p = 0, len7 = ref5.length; p < len7; p++) {
-        line = ref5[p];
+      ref6 = el.lines;
+      for (q = 0, len8 = ref6.length; q < len8; q++) {
+        line = ref6[q];
         matches = line.match(regexLib.link);
         if (matches != null) {
-          for (q = 0, len8 = matches.length; q < len8; q++) {
-            sec = matches[q];
+          for (s = 0, len9 = matches.length; s < len9; s++) {
+            sec = matches[s];
             content = sec.replace("[", "");
             content = content.replace("]", "");
             linkedH[`${content}`] = true;
             linkedS = false; // Para determinar si existe el objetivo del enlace
-            for (s = 0, len9 = listH.length; s < len9; s++) {
-              h = listH[s];
+            for (t = 0, len10 = listH.length; t < len10; t++) {
+              h = listH[t];
               if (h === content) {
                 linkedS = true;
               }
@@ -442,15 +471,15 @@ Talos = class Talos {
               this.info.html(`${this.info.html()}<span style='color: darkgoldenrod;'>ADVERTENCIA: La sección <b>${content}</b>  a la que apunta <b>${this.storySrc.blocks[index].name}</b> no existe.</span><br/>`);
             }
             if (isNaN(content)) {
-              for (t = 0, len10 = mapSections.length; t < len10; t++) {
-                normal = mapSections[t];
+              for (u = 0, len11 = mapSections.length; u < len11; u++) {
+                normal = mapSections[u];
                 if (content === normal.name) {
                   elem = normal;
                 }
               }
             } else {
-              for (u = 0, len11 = fixedSections.length; u < len11; u++) {
-                fixed = fixedSections[u];
+              for (v = 0, len12 = fixedSections.length; v < len12; v++) {
+                fixed = fixedSections[v];
                 if (parseInt(content) === fixed.number) {
                   elem = fixed;
                 }
@@ -464,7 +493,6 @@ Talos = class Talos {
                   line = line.replaceAll(sec, ` **${elem.title}** (${this.yaml.turn_to}[${elem.number}](#${elem.number}))`);
                 }
               } else {
-                test = mapSections;
                 line = line.replaceAll(sec, ` ${this.yaml.turn_to}[${elem.number}](#${elem.number})`);
               }
             } else {
@@ -480,15 +508,15 @@ Talos = class Talos {
     // REVISAR SI ALGUNA SECCION SE ENCUENTRA NO ENLAZADA
     this.info.html(`${this.info.html()}<span><i>[5/8] Examinando si hay secciones huérfanas...</i></span></br>`);
     orphans = [];
-    for (v = 0, len12 = listH.length; v < len12; v++) {
-      sec = listH[v];
+    for (w = 0, len13 = listH.length; w < len13; w++) {
+      sec = listH[w];
       if (!linkedH[sec]) {
         orphans.push(sec);
       }
     }
     if (orphans) {
-      for (w = 0, len13 = orphans.length; w < len13; w++) {
-        sec = orphans[w];
+      for (x = 0, len14 = orphans.length; x < len14; x++) {
+        sec = orphans[x];
         if (sec !== '1') {
           this.info.html(`${this.info.html()}<span style='color: darkgoldenrod;'>ADVERTENCIA: Ningún enlace apunta a la sección <b>${sec}</b>.</span><br/>`);
         }
@@ -498,14 +526,14 @@ Talos = class Talos {
     this.info.html(`${this.info.html()}<span><i>[6/8] Organizando las secciones en orden secuencial...</i></span></br>`);
     index = 0;
     elsNorm = [];
-    ref6 = this.story.blocks;
-    for (x = 0, len14 = ref6.length; x < len14; x++) {
-      el = ref6[x];
+    ref7 = this.story.blocks;
+    for (y = 0, len15 = ref7.length; y < len15; y++) {
+      el = ref7[y];
       if (el.type === "ignored") {
         this.src += `<h1 style='text-align: center;line-height: 1.2em;'>${el.name}</h1>\n\n`;
-        ref7 = el.lines;
-        for (y = 0, len15 = ref7.length; y < len15; y++) {
-          line = ref7[y];
+        ref8 = el.lines;
+        for (z = 0, len16 = ref8.length; z < len16; z++) {
+          line = ref8[z];
           this.src += `${line}\n`;
         }
       } else if (el.type === "fixed") {
@@ -517,38 +545,48 @@ Talos = class Talos {
               return -1;
             }
           });
-          for (z = 0, len16 = elsNorm.length; z < len16; z++) {
-            els = elsNorm[z];
+          for (i1 = 0, len17 = elsNorm.length; i1 < len17; i1++) {
+            els = elsNorm[i1];
             if (this.yaml.titled_sections && els.title && !this.yaml.hide_sections && (this.yaml.output === 'html' || this.yaml.output === 'epub')) {
               this.src += `<h1 id='${els.name}' name='${els.name}' style='text-align: center;line-height: 1.2em;'>${els.title}</h1>\n\n`;
+              graph_book += `# ${els.name}\n`;
             } else if (this.yaml.hide_sections && (this.yaml.output === 'html' || this.yaml.output === 'epub')) {
               this.src += `<hr id='${els.name}' name='${els.name}'/>\n\n`;
+              graph_book += `# ${els.name}\n`;
             } else if (!this.yaml.hide_sections && this.yaml.titled_sections && els.title && (this.yaml.output === 'pdf' || this.yaml.output === 'docx')) {
               this.src += `<h1 id='${els.name}' name='${els.name}' style='text-align: center;line-height: 1.2em;'>${els.name}</h1>\n\n<h2>${els.title}</h2>\n\n`;
+              graph_book += `# ${els.name}\n`;
             } else {
               this.src += `<h1 id='${els.name}' name='${els.name}' style='text-align: center;line-height: 1.2em;'>${els.name}</h1>\n\n`;
+              graph_book += `# ${els.name}\n`;
             }
-            ref8 = els.lines;
-            for (i1 = 0, len17 = ref8.length; i1 < len17; i1++) {
-              line = ref8[i1];
+            ref9 = els.lines;
+            for (j1 = 0, len18 = ref9.length; j1 < len18; j1++) {
+              line = ref9[j1];
               this.src += `${line}\n`;
+              graph_book += `${line}\n`;
             }
           }
         }
         elsNorm = [];
         if (this.yaml.titled_sections && el.title && !this.yaml.hide_sections && (this.yaml.output === 'html' || this.yaml.output === 'epub')) {
           this.src += `<h1 id='${el.name}' name='${el.name}' style='text-align: center;line-height: 1.2em;'>${el.title}</h1>\n\n`;
+          graph_book += `# ${el.name}\n`;
         } else if (this.yaml.hide_sections && (this.yaml.output === 'html' || this.yaml.output === 'epub')) {
           this.src += `<hr id='${el.name}' name='${el.name}'/>\n\n`;
+          graph_book += `# ${el.name}\n`;
         } else if (!this.yaml.hide_sections && this.yaml.titled_sections && el.title && (this.yaml.output === 'pdf' || this.yaml.output === 'docx')) {
           this.src += `<h1 id='${el.name}' name='${el.name}' style='text-align: center;line-height: 1.2em;'>${el.name}</h1>\n\n<h2>${el.title}</h2>\n\n`;
+          graph_book += `# ${el.name}\n`;
         } else {
           this.src += `<h1 id='${el.name}' name='${el.name}' style='text-align: center;line-height: 1.2em;'>${el.name}</h1>\n\n`;
+          graph_book += `# ${el.name}\n`;
         }
-        ref9 = el.lines;
-        for (j1 = 0, len18 = ref9.length; j1 < len18; j1++) {
-          line = ref9[j1];
+        ref10 = el.lines;
+        for (k1 = 0, len19 = ref10.length; k1 < len19; k1++) {
+          line = ref10[k1];
           this.src += `${line}\n`;
+          graph_book += `${line}\n`;
         }
       } else if (el.type === "normal") {
         elsNorm.push(el);
@@ -563,21 +601,26 @@ Talos = class Talos {
           return -1;
         }
       });
-      for (k1 = 0, len19 = elsNorm.length; k1 < len19; k1++) {
-        els = elsNorm[k1];
+      for (l1 = 0, len20 = elsNorm.length; l1 < len20; l1++) {
+        els = elsNorm[l1];
         if (this.yaml.titled_sections && els.title && !this.yaml.hide_sections && (this.yaml.output === 'html' || this.yaml.output === 'epub')) {
           this.src += `<h1 id='${els.name}' name='${els.name}' style='text-align: center;line-height: 1.2em;'>${els.title}</h1>\n\n`;
+          graph_book += `# ${els.name}\n`;
         } else if (this.yaml.hide_sections && (this.yaml.output === 'html' || this.yaml.output === 'epub')) {
           this.src += `<hr id='${els.name}' name='${els.name}'/>\n\n`;
+          graph_book += `# ${els.name}\n`;
         } else if (!this.yaml.hide_sections && this.yaml.titled_sections && els.title && (this.yaml.output === 'pdf' || this.yaml.output === 'docx')) {
           this.src += `<h1 id='${els.name}' name='${els.name}' style='text-align: center;line-height: 1.2em;'>${els.name}</h1>\n\n<h2>${els.title}</h2>\n\n`;
+          graph_book += `# ${els.name}\n`;
         } else {
           this.src += `<h1 id='${els.name}' name='${els.name}' style='text-align: center;line-height: 1.2em;'>${els.name}</h1>\n\n`;
+          graph_book += `# ${els.name}\n`;
         }
-        ref10 = els.lines;
-        for (l1 = 0, len20 = ref10.length; l1 < len20; l1++) {
-          line = ref10[l1];
+        ref11 = els.lines;
+        for (m1 = 0, len21 = ref11.length; m1 < len21; m1++) {
+          line = ref11[m1];
           this.src += `${line}\n`;
+          graph_book += `${line}\n`;
         }
       }
     }
