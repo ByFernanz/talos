@@ -1,4 +1,4 @@
-var Talos, extractBlocks, extractYAML, getBlockType, graph_book, parseText, randomNum, regexLib, saveTextFile, test, toDOCX, toEPUB, toHTML, toPDF;
+var Talos, extractBlocks, extractClass, extractYAML, getBlockType, graph_book, parseText, randomNum, regexLib, saveTextFile, test, toDOCX, toEPUB, toHTML, toPDF;
 
 test = null;
 
@@ -9,7 +9,8 @@ regexLib = {
   fixed: /^[0-9]+\s{0,1}(.*)$/m,
   ignored: /^[A-Z].*$/m,
   link: /\[([^\[\]]+)\](?!\(|\:|{)/gm,
-  div: /^(\:{3,}).*/m
+  div: /^(\:{3,}).*/m,
+  comment: /<!--(.*?)-->/g
 };
 
 parseText = function(text) {
@@ -23,14 +24,18 @@ parseText = function(text) {
 };
 
 extractYAML = function(lines) {
-  var cleanLines, el, firstLine, i, j, len, len1, line, ymlBlock, ymlHead, ymlLines;
+  var cleanLines, el, firstLine, i, j, len, len1, line, secure, ymlBlock, ymlHead, ymlLines;
   ymlLines = [];
   ymlBlock = "";
-  firstLine = true;
+  firstLine = false;
   cleanLines = [];
   ymlHead = false; // para confirmar si existe un bloque YML
+  secure = false;
   for (i = 0, len = lines.length; i < len; i++) {
     line = lines[i];
+    if (!firstLine && !ymlHead && !secure && line.startsWith("---")) {
+      firstLine = true;
+    }
     if (firstLine && !ymlHead) {
       if (line.startsWith("---")) {
         firstLine = false;
@@ -42,6 +47,7 @@ extractYAML = function(lines) {
       if (line.startsWith("---")) {
         firstLine = false;
         ymlHead = false;
+        secure = true;
       } else {
         ymlLines.push(line);
       }
@@ -54,6 +60,46 @@ extractYAML = function(lines) {
     ymlBlock += el + "\n";
   }
   return {ymlBlock, cleanLines};
+};
+
+extractClass = function(lines) {
+  var col, el, endBlock, firstLine, i, j, len, len1, line, name, ymlBlock, ymlHead, ymlLines;
+  ymlLines = [];
+  ymlBlock = "";
+  col = [];
+  firstLine = false;
+  ymlHead = false; // para confirmar si existe un bloque YML
+  endBlock = true;
+  for (i = 0, len = lines.length; i < len; i++) {
+    line = lines[i];
+    if (line.startsWith("# " && !col)) {
+      return null;
+    } else if (line.startsWith("# ")) {
+      return col;
+    } else if (!firstLine && !ymlHead && endBlock && line.startsWith("===")) {
+      endBlock = false;
+      name = line.replace(/(=|\s)/gm, "");
+      ymlLines.push("name: " + name);
+      firstLine = true;
+      firstLine = false;
+      ymlHead = true;
+    } else if (!firstLine && ymlHead) {
+      if (line.startsWith("---")) {
+        firstLine = false;
+        ymlHead = false;
+        endBlock = true;
+        for (j = 0, len1 = ymlLines.length; j < len1; j++) {
+          el = ymlLines[j];
+          ymlBlock += el + "\n";
+        }
+        col.push(ymlBlock);
+        ymlBlock = "";
+        ymlLines = [];
+      } else {
+        ymlLines.push(line);
+      }
+    }
+  }
 };
 
 getBlockType = function(section) {
@@ -335,7 +381,7 @@ Talos = class Talos {
       }
       index++;
     }
-    // REMOVIENDO DIVS
+    // REMOVIENDO DIVS Y COMENTARIOS
     index = 0;
     ref2 = this.story.blocks;
     for (k = 0, len2 = ref2.length; k < len2; k++) {
@@ -346,6 +392,9 @@ Talos = class Talos {
         line = ref3[l];
         if (line.match(regexLib.div) != null) {
           this.story.blocks[index].lines[indexL] = "";
+        }
+        if (line.match(regexLib.comment) != null) {
+          this.story.blocks[index].lines[indexL] = line.replace(regexLib.comment, "");
         }
         indexL++;
       }
@@ -628,6 +677,7 @@ Talos = class Talos {
     
     // CONVERTIR MARKDOWN A HTML
     this.info.html(`${this.info.html()}<span><i>[7/8] Renderizando documento...</i></span></br>`);
+    test = html;
     html = this.converter.render(this.src);
     // SI SOLO ES PARA PREVIEW
     if (preview === 'preview') {

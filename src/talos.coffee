@@ -6,7 +6,8 @@ regexLib =
 	fixed: /^[0-9]+\s{0,1}(.*)$/m,
 	ignored: /^[A-Z].*$/m,
 	link:  /\[([^\[\]]+)\](?!\(|\:|{)/gm,
-	div: /^(\:{3,}).*/m
+	div: /^(\:{3,}).*/m,
+	comment: /<!--(.*?)-->/g
 
 parseText = (text) ->
 	lines = text.split /\n|\r\n/
@@ -20,10 +21,13 @@ parseText = (text) ->
 extractYAML = (lines) ->
 	ymlLines = []
 	ymlBlock = ""
-	firstLine = true
+	firstLine = false
 	cleanLines = []
 	ymlHead = false # para confirmar si existe un bloque YML
+	secure = false
 	for line in lines
+		if not firstLine and not ymlHead and not secure and line.startsWith "---"
+			firstLine = true
 		if firstLine and not ymlHead
 			if line.startsWith "---"
 				firstLine = false
@@ -34,6 +38,7 @@ extractYAML = (lines) ->
 			if line.startsWith "---"
 				firstLine = false
 				ymlHead = false
+				secure = true
 			else
 				ymlLines.push line
 		else
@@ -41,6 +46,38 @@ extractYAML = (lines) ->
 	for el in ymlLines
 		ymlBlock += el + "\n"
 	return {ymlBlock, cleanLines}
+
+extractClass = (lines) ->
+	ymlLines = []
+	ymlBlock = ""
+	col = []
+	firstLine = false
+	ymlHead = false # para confirmar si existe un bloque YML
+	endBlock = true
+	for line in lines
+		if line.startsWith "# " and not col
+			return null
+		else if line.startsWith "# "
+			return col
+		else if not firstLine and not ymlHead and endBlock and line.startsWith "==="
+			endBlock = false
+			name = line.replace(/(=|\s)/gm,"")
+			ymlLines.push "name: " + name
+			firstLine = true
+			firstLine = false
+			ymlHead = true
+		else if not firstLine and ymlHead
+			if line.startsWith "---"
+				firstLine = false
+				ymlHead = false
+				endBlock = true
+				for el in ymlLines
+					ymlBlock += el + "\n"
+				col.push ymlBlock
+				ymlBlock = ""
+				ymlLines = []
+			else
+				ymlLines.push line
 
 
 getBlockType = (section) ->
@@ -288,13 +325,15 @@ class Talos
 				counterNormal++
 			index++
 
-		# REMOVIENDO DIVS
+		# REMOVIENDO DIVS Y COMENTARIOS
 		index = 0
 		for el in @story.blocks
 			indexL = 0
 			for line in el.lines
 				if line.match(regexLib.div)?
 					@story.blocks[index].lines[indexL] = ""
+				if line.match(regexLib.comment)?
+					@story.blocks[index].lines[indexL] = line.replace(regexLib.comment, "")
 				indexL++
 			index++
 		
@@ -507,6 +546,7 @@ class Talos
 
 		# CONVERTIR MARKDOWN A HTML
 		@info.html "#{@info.html()}<span><i>[7/8] Renderizando documento...</i></span></br>"
+		test = html
 		html = @converter.render(@src)
 
 		# SI SOLO ES PARA PREVIEW
